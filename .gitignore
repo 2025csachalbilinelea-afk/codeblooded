@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Production build outputs
+dist/
+dist-ssr/
+
+# Environment variables & local configuration
+*.local
+.env
+.env.*
+!.env.example
+
+# Testing & code coverage
+coverage/
+
+# TypeScript build info & caches
+*.tsbuildinfo
+.eslintcache
+
+# OS metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# IDE & Editor configuration
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
