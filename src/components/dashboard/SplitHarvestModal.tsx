@@ -1,7 +1,7 @@
 import React from 'react';
 import { SplitHarvestResult } from '../../types/agriculture';
 import { formatINR } from '../../utils/currency';
-import { Split, X, CheckCircle2, AlertTriangle, ArrowRight, TrendingUp } from 'lucide-react';
+import { Split, X, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 
 interface SplitHarvestModalProps {
   splitResult: SplitHarvestResult | null;
@@ -12,26 +12,27 @@ export const SplitHarvestModal: React.FC<SplitHarvestModalProps> = ({ splitResul
   if (!splitResult) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
-      <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-rural-deep/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+      <div className="bg-white rounded-3xl shadow-2xl border border-rural-border w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 font-sans">
         {/* Header */}
-        <div className="bg-stone-900 text-stone-100 p-5 flex items-start justify-between">
+        <div className="bg-rural-forest text-white p-5 flex items-start justify-between">
           <div>
             <div className="flex items-center space-x-2">
-              <Split className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+              <Split className="w-4 h-4 text-rural-fresh" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-rural-mint">
                 Selling at Two Markets
               </span>
             </div>
-            <h2 className="text-lg font-bold text-white mt-1">Plan for Selling at Two Markets</h2>
-            <p className="text-xs text-stone-400">
+            <h2 className="text-lg font-serif font-bold text-white mt-1">Plan for Selling at Two Markets</h2>
+            <p className="text-xs text-rural-mint/80">
               Dividing your harvest to get higher prices while respecting market purchase limits.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg bg-stone-800 text-stone-400 hover:text-white hover:bg-stone-700 transition-colors"
+            className="p-1.5 rounded-xl bg-rural-deep text-white/80 hover:text-white transition-colors cursor-pointer"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -41,100 +42,89 @@ export const SplitHarvestModal: React.FC<SplitHarvestModalProps> = ({ splitResul
         <div className="p-5 space-y-4 text-xs">
           {/* Verdict Banner */}
           <div
-            className={`p-3.5 rounded-xl border flex items-start space-x-2.5 ${
+            className={`p-4 rounded-2xl border flex items-start space-x-3 ${
               splitResult.isSplitAdvantageous
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                ? 'bg-rural-sage/80 border-rural-fresh/50 text-rural-forest'
                 : 'bg-amber-50 border-amber-300 text-amber-950'
             }`}
           >
             {splitResult.isSplitAdvantageous ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-5 h-5 text-rural-fresh shrink-0 mt-0.5" />
             ) : (
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             )}
             <div>
-              <strong className="text-sm font-bold block">
+              <strong className="text-sm font-serif font-bold block">
                 {splitResult.isSplitAdvantageous
                   ? `Splitting Yields +${formatINR(splitResult.netGainFromSplitting)} Extra Profit!`
                   : 'Single-Market Sale Remains Preferred'}
               </strong>
-              <p className="text-xs mt-1 leading-relaxed">{splitResult.explanation}</p>
+              <p className="text-xs mt-1 leading-relaxed font-sans">
+                {splitResult.explanation}
+              </p>
             </div>
           </div>
 
-          {/* Allocation Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* Allocation details */}
+          <div className="space-y-2">
+            <h4 className="font-serif font-bold text-rural-forest text-xs uppercase tracking-wider">
+              Allocated Destinations
+            </h4>
             {splitResult.allocations.map((alloc, idx) => (
-              <div key={alloc.market.id} className="bg-stone-50 rounded-xl p-3.5 border border-stone-200">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-stone-200 text-stone-700">
-                    Route #{idx + 1} Allocation
-                  </span>
-                  <span className="font-bold text-emerald-800 text-xs">
-                    {alloc.allocatedQuintals} Qtl
+              <div
+                key={alloc.market.id}
+                className="p-3.5 rounded-2xl border border-rural-border bg-rural-cream flex items-center justify-between"
+              >
+                <div>
+                  <strong className="font-serif font-bold text-rural-forest text-sm block">
+                    Leg #{idx + 1}: {alloc.market.name}
+                  </strong>
+                  <span className="text-[11px] text-rural-muted">
+                    {alloc.market.locationName} • {alloc.market.distanceKm} km haul
                   </span>
                 </div>
-                <h4 className="font-bold text-stone-900 text-sm truncate">{alloc.market.name}</h4>
-                <p className="text-[11px] text-stone-500 mb-2.5">
-                  {alloc.market.locationName} ({alloc.market.distanceKm} km)
-                </p>
-
-                <div className="space-y-1 divide-y divide-stone-200 text-stone-600 text-[11px]">
-                  <div className="flex justify-between pt-1">
-                    <span>Grade A Rate:</span>
-                    <strong>{formatINR(alloc.market.pricesPerQuintal.A)}/Qtl</strong>
-                  </div>
-                  <div className="flex justify-between pt-1">
-                    <span>Gross Proceeds:</span>
-                    <span>{formatINR(alloc.grossRevenue)}</span>
-                  </div>
-                  <div className="flex justify-between pt-1">
-                    <span>Transport Deducted:</span>
-                    <span className="text-rose-600">-{formatINR(alloc.transportCost)}</span>
-                  </div>
-                  <div className="flex justify-between pt-1">
-                    <span>Market Deductions:</span>
-                    <span className="text-rose-600">-{formatINR(alloc.marketFees)}</span>
-                  </div>
-                  <div className="flex justify-between pt-1.5 font-bold text-stone-900">
-                    <span>Route Net Contribution:</span>
-                    <span className="text-emerald-800">{formatINR(alloc.netReturn)}</span>
-                  </div>
+                <div className="text-right">
+                  <span className="font-black text-rural-forest text-sm font-sans block">
+                    {alloc.allocatedQuintals.toFixed(1)} Qtl
+                  </span>
+                  <span className="text-[11px] text-rural-primary font-semibold">
+                    Net: {formatINR(alloc.netReturn)}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Comparative Summary */}
-          <div className="bg-stone-100 rounded-xl p-3.5 border border-stone-200 flex items-center justify-between text-xs">
+          {/* Bottom Financial summary */}
+          <div className="bg-rural-forest text-white rounded-2xl p-4 flex items-center justify-between shadow-rural-soft">
             <div>
-              <span className="text-stone-500 block">Single-Market Best Return:</span>
-              <span className="font-bold text-stone-800 text-sm">
-                {formatINR(splitResult.singleBestNetReturn)}
+              <span className="text-[10px] uppercase font-bold text-rural-mint block">
+                Total Multi-Market Net Return
+              </span>
+              <span className="text-2xl font-black tracking-tight font-sans">
+                {formatINR(splitResult.planTotals.totalNetReturn)}
               </span>
             </div>
-            <ArrowRight className="w-4 h-4 text-stone-400" />
             <div className="text-right">
-              <span className="text-stone-500 block">Split-Strategy Combined Return:</span>
-              <span className="font-bold text-emerald-800 text-sm">
-                {formatINR(splitResult.totalNetReturn)}
+              <span className="text-[10px] text-rural-mint/80 block">Net Advantage</span>
+              <span className="text-base font-bold text-rural-mint font-sans">
+                {splitResult.netGainFromSplitting >= 0 ? `+${formatINR(splitResult.netGainFromSplitting)}` : `-${formatINR(Math.abs(splitResult.netGainFromSplitting))}`}
               </span>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="bg-stone-100 p-3 px-5 border-t border-stone-200 flex justify-end">
+        <div className="bg-rural-cream p-3 px-5 border-t border-rural-border flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-stone-800 hover:bg-stone-900 text-white font-semibold rounded-lg text-xs transition-colors"
+            className="px-5 py-2 bg-rural-forest hover:bg-rural-deep text-white font-semibold rounded-xl text-xs transition-colors cursor-pointer"
           >
-            Dismiss
+            Close
           </button>
         </div>
       </div>
     </div>
   );
 };
-

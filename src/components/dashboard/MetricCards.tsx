@@ -1,7 +1,7 @@
 import React from 'react';
 import { MarketCalculationResult } from '../../types/agriculture';
 import { formatINR, formatPercent } from '../../utils/currency';
-import { Trophy, TrendingUp, PackageCheck, AlertCircle, Fuel, Building2 } from 'lucide-react';
+import { Trophy, TrendingUp, PackageCheck, AlertCircle, Fuel, Building2, CheckCircle2, ArrowRight } from 'lucide-react';
 
 interface MetricCardsProps {
   bestMarket: MarketCalculationResult | null;
@@ -11,12 +11,14 @@ interface MetricCardsProps {
 export const MetricCards: React.FC<MetricCardsProps> = ({ bestMarket, totalHarvestQuintals }) => {
   if (!bestMarket) {
     return (
-      <div className="bg-rose-50 border border-rose-300 rounded-xl p-6 text-center">
-        <AlertCircle className="w-10 h-10 text-rose-500 mx-auto mb-2" />
-        <h3 className="text-base font-bold text-rose-900">No Market Found That Can Buy Your Full Crop</h3>
-        <p className="text-xs text-rose-700 max-w-lg mx-auto mt-1">
-          None of the nearby markets can buy your full harvest of {totalHarvestQuintals.toFixed(1)} Quintals
-          in a single trip due to market buying limits or vehicle space. Try reducing quantity or check the Split Harvest option below.
+      <div className="bg-rose-50 border border-rose-300 rounded-3xl p-6 sm:p-8 text-center shadow-rural-soft">
+        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-3" />
+        <h3 className="text-lg font-serif font-bold text-rose-950">
+          No Market Found That Can Buy Your Full Crop
+        </h3>
+        <p className="text-sm text-rose-800 max-w-xl mx-auto mt-2 leading-relaxed">
+          None of the nearby markets can purchase your complete harvest of{' '}
+          <strong>{totalHarvestQuintals.toFixed(1)} Quintals</strong> in a single transaction due to market buying limits or vehicle constraints. Consider lowering your volume or check the multi-market Split Harvest option below.
         </p>
       </div>
     );
@@ -25,123 +27,133 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ bestMarket, totalHarve
   const isNetPositive = bestMarket.netReturn >= 0;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* 1. Best Market Choice */}
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -z-0 opacity-80" />
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 flex items-center space-x-1">
-              <Trophy className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Best Market Choice</span>
-            </span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-              Best Option
-            </span>
+    <div className="space-y-4">
+      {/* 1. HERO RESULT CARD: "OUR RECOMMENDED MARKET" */}
+      <div className="bg-gradient-to-br from-rural-forest via-rural-deep to-rural-forest text-white rounded-3xl p-6 sm:p-8 shadow-rural-card border border-rural-deep relative overflow-hidden">
+        {/* Ambient botanical glow */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-rural-fresh/15 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/10">
+          <div>
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rural-fresh/20 border border-rural-fresh/40 text-rural-mint text-xs font-semibold uppercase tracking-wider mb-2">
+              <Trophy className="w-3.5 h-3.5 text-rural-fresh" />
+              <span>Our Recommended Market</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-white tracking-tight">
+              {bestMarket.market.name}
+            </h2>
+            <p className="text-sm text-rural-mint/80 mt-1 flex items-center space-x-2">
+              <Building2 className="w-4 h-4 text-rural-fresh" />
+              <span>{bestMarket.market.locationName}</span>
+              <span>•</span>
+              <span>{bestMarket.market.distanceKm} km away</span>
+              <span>•</span>
+              <span>Approx. {bestMarket.market.estimatedTravelTimeHours} hrs travel</span>
+            </p>
           </div>
-          <h3 className="text-base font-bold text-stone-900 leading-tight truncate" title={bestMarket.market.name}>
-            {bestMarket.market.name}
-          </h3>
-          <p className="text-xs text-stone-500 mt-0.5 flex items-center space-x-1">
-            <Building2 className="w-3 h-3 text-stone-400" />
-            <span className="truncate">{bestMarket.market.locationName}</span>
-          </p>
-          <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs text-stone-600">
-            <span>Distance: <strong>{bestMarket.market.distanceKm} km</strong></span>
-            <span>Travel Time: <strong>{bestMarket.market.estimatedTravelTimeHours} hrs</strong></span>
+
+          {/* Large In-Pocket Earnings Display */}
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/15 min-w-[260px] text-left lg:text-right">
+            <span className="text-xs uppercase font-semibold text-rural-mint/90 tracking-wider block">
+              Estimated Money You Keep
+            </span>
+            <div className="text-3xl sm:text-4xl font-sans font-black text-white mt-0.5 tracking-tight">
+              {formatINR(bestMarket.netReturn)}
+            </div>
+            <div className="text-xs sm:text-sm text-rural-mint font-medium mt-1">
+              Estimated earnings per quintal:{' '}
+              <strong className="text-white font-bold">
+                {formatINR(bestMarket.netReturnPerQuintal)} / Qtl
+              </strong>
+            </div>
           </div>
+        </div>
+
+        {/* Breakdown Row & Why We Recommend This Market */}
+        <div className="relative z-10 pt-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+          <div className="md:col-span-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs sm:text-sm text-white/80">
+            <div>
+              <span className="text-rural-mint/70">Expected Sales:</span>{' '}
+              <strong className="text-white font-semibold">
+                {formatINR(bestMarket.grossRevenue)}
+              </strong>
+            </div>
+            <span className="text-white/30 hidden sm:inline">•</span>
+            <div>
+              <span className="text-rural-mint/70">Transport & Market Expenses:</span>{' '}
+              <strong className="text-amber-300 font-semibold">
+                -{formatINR(bestMarket.totalExpenses)}
+              </strong>
+            </div>
+            <span className="text-white/30 hidden sm:inline">•</span>
+            <div>
+              <span className="text-rural-mint/70">Available to Sell:</span>{' '}
+              <strong className="text-white font-semibold">
+                {bestMarket.saleableQuantityQuintals.toFixed(1)} Qtl
+              </strong>
+            </div>
+          </div>
+
+          <div className="md:col-span-4 lg:text-right">
+            <div className="inline-flex items-center space-x-1.5 text-xs text-rural-mint font-medium bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+              <CheckCircle2 className="w-3.5 h-3.5 text-rural-fresh" />
+              <span>100% Full Consignment Accepted</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Explanation Rationale */}
+        <div className="relative z-10 mt-4 p-3.5 rounded-xl bg-rural-deep/70 border border-white/10 text-xs sm:text-sm text-white/90 leading-relaxed font-sans">
+          <strong className="font-semibold text-rural-mint">Why we recommend this market: </strong>
+          {bestMarket.netReturn >= 0
+            ? `This market leaves you with the highest take-home earnings of ${formatINR(bestMarket.netReturn)} after accounting for ${formatINR(bestMarket.transportationCost)} in delivery costs, ${formatINR(bestMarket.totalMarketFees)} in market charges, and ${bestMarket.physicalLossQuintals.toFixed(1)} Qtl estimated loss on the way.`
+            : `Even though selling prices are tight, this destination minimizes your total delivery expenses and loss.`}
         </div>
       </div>
 
-      {/* 2. Estimated Money You Will Earn */}
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden">
-        <div className={`absolute top-0 right-0 w-24 h-24 ${isNetPositive ? 'bg-emerald-50' : 'bg-rose-50'} rounded-bl-full -z-0 opacity-80`} />
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center space-x-1">
-              <TrendingUp className={`w-3.5 h-3.5 ${isNetPositive ? 'text-emerald-600' : 'text-rose-600'}`} />
-              <span>Estimated Money You Will Earn</span>
-            </span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-              isNetPositive ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-            }`}>
-              {isNetPositive ? 'Profit' : 'Loss'}
-            </span>
+      {/* 2. THREE SUPPORTING SUMMARY METRIC CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Card A: Expected Sales */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-rural-border shadow-rural-soft">
+          <div className="flex items-center justify-between text-xs text-rural-muted mb-1.5 font-medium">
+            <span className="uppercase tracking-wider">Expected Sales</span>
+            <TrendingUp className="w-4 h-4 text-rural-primary" />
           </div>
-          <h3 className={`text-2xl font-bold tracking-tight ${isNetPositive ? 'text-emerald-900' : 'text-rose-700'}`}>
-            {formatINR(bestMarket.netReturn)}
-          </h3>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Money You Keep per Quintal:{' '}
-            <strong className={isNetPositive ? 'text-emerald-700' : 'text-rose-700'}>
-              {formatINR(bestMarket.netReturnPerQuintal)} / Qtl
-            </strong>
+          <div className="text-2xl font-bold text-rural-forest font-sans">
+            {formatINR(bestMarket.grossRevenue)}
+          </div>
+          <p className="text-xs text-rural-muted mt-1">
+            Sold at {formatINR(Math.round(bestMarket.grossRevenue / Math.max(0.1, bestMarket.saleableQuantityQuintals)))} / Qtl effective rate
           </p>
-          <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs text-stone-600">
-            <span>Total Selling Money: {formatINR(bestMarket.grossRevenue)}</span>
-            <span className="text-stone-400">•</span>
-            <span className="text-stone-500">After All Expenses</span>
-          </div>
         </div>
-      </div>
 
-      {/* 3. Crop Available to Sell */}
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-24 h-24 bg-stone-50 rounded-bl-full -z-0 opacity-80" />
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center space-x-1">
-              <PackageCheck className="w-3.5 h-3.5 text-stone-600" />
-              <span>Crop Available to Sell</span>
-            </span>
-            <span className="text-[10px] bg-stone-100 text-stone-700 font-bold px-2 py-0.5 rounded-full">
-              {bestMarket.capacityUtilizationPercent}% Capacity
-            </span>
+        {/* Card B: Produce Available to Sell */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-rural-border shadow-rural-soft">
+          <div className="flex items-center justify-between text-xs text-rural-muted mb-1.5 font-medium">
+            <span className="uppercase tracking-wider">Available to Sell</span>
+            <PackageCheck className="w-4 h-4 text-rural-primary" />
           </div>
-          <h3 className="text-2xl font-bold text-stone-900 tracking-tight">
+          <div className="text-2xl font-bold text-rural-forest font-sans">
             {bestMarket.saleableQuantityQuintals.toFixed(1)}{' '}
-            <span className="text-sm font-semibold text-stone-500">Quintals</span>
-          </h3>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Crop Lost on the Way:{' '}
-            <strong className="text-amber-700">
-              {bestMarket.physicalLossQuintals.toFixed(1)} Qtl ({formatPercent(bestMarket.estimatedLossPercent)})
-            </strong>
-          </p>
-          <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs text-stone-600">
-            <span>Harvest: {totalHarvestQuintals.toFixed(1)} Qtl</span>
-            <span className="text-stone-400">•</span>
-            <span>Left to Sell: {formatPercent(100 - bestMarket.estimatedLossPercent)}</span>
+            <span className="text-sm font-semibold text-rural-muted">Qtl</span>
           </div>
+          <p className="text-xs text-amber-800 font-medium mt-1">
+            Crop lost on way: {bestMarket.physicalLossQuintals.toFixed(1)} Qtl ({formatPercent(bestMarket.estimatedLossPercent)})
+          </p>
         </div>
-      </div>
 
-      {/* 4. Transport and Market Charges */}
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-bl-full -z-0 opacity-80" />
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center space-x-1">
-              <Fuel className="w-3.5 h-3.5 text-amber-600" />
-              <span>Transport and Market Charges</span>
-            </span>
-            <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
-              {bestMarket.transportTrips} {bestMarket.transportTrips === 1 ? 'Trip' : 'Trips'}
-            </span>
+        {/* Card C: Transport & Market Fees */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-rural-border shadow-rural-soft">
+          <div className="flex items-center justify-between text-xs text-rural-muted mb-1.5 font-medium">
+            <span className="uppercase tracking-wider">Transport & Market Fees</span>
+            <Fuel className="w-4 h-4 text-amber-700" />
           </div>
-          <h3 className="text-2xl font-bold text-stone-900 tracking-tight">
+          <div className="text-2xl font-bold text-rural-forest font-sans">
             {formatINR(bestMarket.totalExpenses)}
-          </h3>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Transport: <strong className="text-stone-700">{formatINR(bestMarket.transportationCost)}</strong> + Market Charges:{' '}
-            <strong className="text-stone-700">{formatINR(bestMarket.totalMarketFees)}</strong>
-          </p>
-          <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs text-stone-600">
-            <span>Cost per Quintal:</span>
-            <strong className="text-stone-800">
-              {formatINR(Math.round(bestMarket.totalExpenses / Math.max(0.1, bestMarket.initialQuantityQuintals)))} / Qtl
-            </strong>
           </div>
+          <p className="text-xs text-rural-muted mt-1">
+            Transport: {formatINR(bestMarket.transportationCost)} • Fees: {formatINR(bestMarket.totalMarketFees)}
+          </p>
         </div>
       </div>
     </div>

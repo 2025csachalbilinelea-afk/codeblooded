@@ -1,9 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FarmerInputs,
   CropProfile,
   MarketCalculationResult,
 } from './types/agriculture';
+import {
+  FarmerLocation,
+  MandiFilterOptions,
+  MandiSortOption,
+  DynamicMandiEvaluation,
+} from './types/marketDiscovery';
 import { getCropById } from './data/crops';
 import { getSimulatedMarketsForCrop } from './data/markets';
 import { rankMarketsByNetReturn } from './engine/ranking';
@@ -11,17 +17,22 @@ import { analyzeHighestPriceVsNetReturn } from './engine/recommendations';
 import { optimizeSplitHarvest } from './engine/splitHarvest';
 import { convertToQuintals } from './engine/units';
 import { validateFarmerInputs } from './utils/validation';
+import { resolveManualLocation } from './services/locationService';
+import { discoverAndEvaluateMandis, DiscoveryEngineResult } from './engine/discoveryEngine';
+import { convertDynamicToMarketCalculationResult } from './utils/dynamicAdapter';
 
+import { LandingPage } from './components/landing/LandingPage';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { CropSelector } from './components/forms/CropSelector';
+import { LocationSelector } from './components/forms/LocationSelector';
 import { HarvestDetails } from './components/forms/HarvestDetails';
-import { ExpectedPriceForm } from './components/forms/ExpectedPriceForm';
 import { SpoilageConfigForm } from './components/forms/SpoilageConfig';
 import { TransportConfigForm } from './components/forms/TransportConfig';
 
 import { MetricCards } from './components/dashboard/MetricCards';
 import { ComparisonCard } from './components/dashboard/ComparisonCard';
+import { DynamicMarketSection } from './components/dashboard/DynamicMarketSection';
 import { MarketRankingTable } from './components/markets/MarketRankingTable';
 import { SplitHarvestSection } from './components/dashboard/SplitHarvestSection';
 import { InfeasibleMarketsSection } from './components/markets/InfeasibleMarketsSection';
@@ -31,7 +42,14 @@ import { FinancialWaterfallChart } from './components/charts/FinancialWaterfallC
 import { VerificationModal } from './components/dashboard/VerificationModal';
 import { MarketReportModal } from './components/dashboard/MarketReportModal';
 
-import { Split, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Split, ShieldCheck, AlertCircle, Sprout, Loader2 } from 'lucide-react';
+
+const INITIAL_LOCATION: FarmerLocation = resolveManualLocation(
+  'Karnataka',
+  'Dharwad',
+  'Navalgund Farm Gate',
+  '582208'
+);
 
 const INITIAL_INPUTS: FarmerInputs = {
   cropId: 'tomato',
@@ -39,7 +57,7 @@ const INITIAL_INPUTS: FarmerInputs = {
   quantityUnit: 'quintal',
   harvestDate: new Date().toISOString().split('T')[0],
   maturity: 'optimal',
-  originLocation: 'Navalgund Farm Gate, Dharwad Hub',
+  originLocation: INITIAL_LOCATION.formattedAddress,
   expectedPricePerQuintal: 2400,
   gradeDistribution: { A: 50, B: 35, C: 15 },
   spoilage: {
@@ -72,7 +90,55 @@ const INITIAL_INPUTS: FarmerInputs = {
 };
 
 export const App: React.FC = () => {
+  // View Router State: Default to 'landing' as specified in product requirements
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard'>(() => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/dashboard') {
+      return 'dashboard';
+    }
+    return 'landing';
+  });
+
+  // Handle browser back/forward history navigation cleanly
+  useEffect(() => {
+    const handlePopState = () => {
+      if (window.location.pathname === '/dashboard') {
+        setCurrentView('dashboard');
+      } else {
+        setCurrentView('landing');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateToDashboard = () => {
+    setCurrentView('dashboard');
+    if (window.location.pathname !== '/dashboard') {
+      window.history.pushState({}, '', '/dashboard');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateToLanding = () => {
+    setCurrentView('landing');
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Farmer Inputs & Location State
   const [inputs, setInputs] = useState<FarmerInputs>(INITIAL_INPUTS);
+  const [farmerLocation, setFarmerLocation] = useState<FarmerLocation>(INITIAL_LOCATION);
+
+  // Phase 5 Discovery State
+  const [sortOption, setSortOption] = useState<MandiSortOption>('netRevenue');
+  const [filters, setFilters] = useState<MandiFilterOptions>({});
+  const [isLiveMode, setIsLiveMode] = useState<boolean>(true);
+  const [dynamicResult, setDynamicResult] = useState<DiscoveryEngineResult | null>(null);
+  const [isDiscovering, setIsDiscovering] = useState<boolean>(false);
+
+  // Modals
   const [selectedBreakdownMarket, setSelectedBreakdownMarket] =
     useState<MarketCalculationResult | null>(null);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState<boolean>(false);
@@ -88,10 +154,54 @@ export const App: React.FC = () => {
     [inputs.quantity, inputs.quantityUnit]
   );
 
-  // Simulated markets tailored specifically to current crop's economics
+  // Simulated markets tailored specifically to current crop's economics (Phase 1-4 baseline)
   const markets = useMemo(() => getSimulatedMarketsForCrop(currentCrop), [currentCrop]);
 
-  // Execute Calculation Engine
+  // Phase 5: Execute Dynamic National Mandi Discovery & Profit Engine
+  useEffect(() => {
+    let isMounted = true;
+    setIsDiscovering(true);
+
+    discoverAndEvaluateMandis(
+      farmerLocation,
+      currentCrop,
+      totalQuintals,
+      inputs.transport,
+      inputs.spoilage,
+      inputs.maturity,
+      {
+        sortOption,
+        filters,
+        apiKey: isLiveMode ? undefined : 'DEMO_BENCHMARK',
+      }
+    )
+      .then((res) => {
+        if (isMounted) {
+          setDynamicResult(res);
+          setIsDiscovering(false);
+        }
+      })
+      .catch((err) => {
+        console.error('Error in dynamic mandi discovery:', err);
+        if (isMounted) setIsDiscovering(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    farmerLocation,
+    currentCrop,
+    totalQuintals,
+    inputs.transport,
+    inputs.spoilage,
+    inputs.maturity,
+    sortOption,
+    filters,
+    isLiveMode,
+  ]);
+
+  // Phase 1-4: Execute Baseline Calculation Engine
   const ranking = useMemo(
     () => rankMarketsByNetReturn(inputs, currentCrop, markets),
     [inputs, currentCrop, markets]
@@ -136,8 +246,19 @@ export const App: React.FC = () => {
     }));
   };
 
+  const handleLocationChange = (newLoc: FarmerLocation) => {
+    setFarmerLocation(newLoc);
+    setInputs((prev) => ({
+      ...prev,
+      originLocation: newLoc.formattedAddress,
+    }));
+  };
+
   const handleResetDefaults = () => {
     setInputs(INITIAL_INPUTS);
+    setFarmerLocation(INITIAL_LOCATION);
+    setSortOption('netRevenue');
+    setFilters({});
   };
 
   const handlePrint = () => {
@@ -148,53 +269,58 @@ export const App: React.FC = () => {
     setInputs(updater);
   };
 
-  const currentExpectedPrice =
-    inputs.expectedPricePerQuintal ??
-    Math.round(
-      (currentCrop.typicalMarketPriceRange.min + currentCrop.typicalMarketPriceRange.max) / 2
-    );
+  const handleSelectDynamicBreakdown = (mandi: DynamicMandiEvaluation) => {
+    const converted = convertDynamicToMarketCalculationResult(mandi);
+    setSelectedBreakdownMarket(converted);
+  };
 
+  // If in Landing Page view, render the comprehensive Rural Roots landing page
+  if (currentView === 'landing') {
+    return <LandingPage onOpenDashboard={navigateToDashboard} />;
+  }
+
+  // If in Dashboard view, render the full functional HarvestRoute dashboard
   return (
-    <div className="min-h-screen flex flex-col bg-warmbg-50">
+    <div className="min-h-screen flex flex-col bg-rural-cream text-rural-charcoal font-sans">
       {/* Top Navigation */}
       <Navbar
+        onGoHome={navigateToLanding}
         onResetDefaults={handleResetDefaults}
         onPrint={handlePrint}
         onToggleVerification={() => setIsVerificationModalOpen(true)}
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Page Title & Context Header in Simple English */}
-        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-stone-200/80 gap-3">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Title & Context Header */}
+        <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-rural-border gap-4">
           <div>
             <div className="flex items-center space-x-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                Farmer Decision Guide
+              <span className="text-xs font-semibold uppercase tracking-wider text-rural-forest bg-rural-mint px-3 py-1 rounded-full border border-rural-fresh/30">
+                Phase 5 Real-Time Mandi Intelligence
               </span>
-              <span className="text-xs text-stone-500">•</span>
-              <span className="text-xs text-stone-600 font-medium">
-                {currentCrop.name} ({totalQuintals.toFixed(1)} Quintals)
+              <span className="text-xs text-rural-muted">•</span>
+              <span className="text-xs text-rural-charcoal font-semibold">
+                {currentCrop.name} ({totalQuintals.toFixed(1)} Qtl) • {farmerLocation.district}, {farmerLocation.state}
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight mt-1">
-              Find the Best Market for Your Crop
+            <h1 className="text-2xl sm:text-4xl font-serif font-bold text-rural-forest tracking-tight mt-1.5">
+              Find the Best Market for Your Harvest
             </h1>
-            <p className="text-xs sm:text-sm text-stone-600 mt-1 max-w-3xl">
-              Enter your harvest details below to see how much money you will keep after travel and
-              market expenses.
+            <p className="text-sm sm:text-base text-rural-muted mt-1.5 max-w-3xl font-sans font-light">
+              Compare real road distances, live daily wholesale prices from AGMARKNET, and net take-home earnings across India.
             </p>
           </div>
 
           {/* Quick Action Badges */}
-          <div className="flex items-center space-x-2 self-start md:self-auto no-print">
+          <div className="flex items-center space-x-3 self-start md:self-auto no-print">
             {splitResult && splitResult.isSplitAdvantageous && (
               <button
                 type="button"
                 onClick={() => setIsSplitModalOpen(true)}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-800 text-white hover:bg-emerald-700 shadow-sm transition-all"
+                className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold bg-rural-forest text-white hover:bg-rural-deep shadow-sm transition-all cursor-pointer"
               >
-                <Split className="w-3.5 h-3.5" />
+                <Split className="w-4 h-4 text-rural-fresh" />
                 <span>
                   Split Harvest (+
                   {splitResult.netGainFromSplitting > 0
@@ -208,9 +334,9 @@ export const App: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsVerificationModalOpen(true)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-stone-700 border border-stone-300 hover:bg-stone-50 transition-colors"
+              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-medium bg-white text-rural-forest border border-rural-border hover:bg-rural-sage/60 transition-colors shadow-rural-soft cursor-pointer"
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+              <ShieldCheck className="w-4 h-4 text-rural-primary" />
               <span>Calculator Is Ready</span>
             </button>
           </div>
@@ -218,8 +344,8 @@ export const App: React.FC = () => {
 
         {/* Validation Errors Notice if any */}
         {!validation.isValid && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs flex items-start space-x-2.5 shadow-sm">
-            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-900 text-xs sm:text-sm flex items-start space-x-3 shadow-sm">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div>
               <strong className="font-bold text-sm block">Please Adjust Input Values:</strong>
               <ul className="list-disc list-inside mt-1 space-y-0.5 text-rose-800">
@@ -232,26 +358,33 @@ export const App: React.FC = () => {
         )}
 
         {/* Dashboard Grid */}
-        <div className="space-y-6">
-          {/* Section: Top Metric Cards */}
+        <div className="space-y-8">
+          {/* Section: Top Hero Metric Cards */}
           <MetricCards
-            bestMarket={ranking.bestMarket}
+            bestMarket={
+              dynamicResult?.recommendedMarket
+                ? convertDynamicToMarketCalculationResult(dynamicResult.recommendedMarket)
+                : ranking.bestMarket
+            }
             totalHarvestQuintals={totalQuintals}
           />
 
-          {/* Section: Signature Comparison - Highest Price vs Highest Net Return */}
+          {/* Section: Signature Comparison - The Highest Price Is Not Always the Best Deal */}
           <ComparisonCard comparison={comparison} />
 
           {/* Two-Column Responsive Layout: Farmer Inputs on Left, Results on Right */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Column: Farmer Input Forms */}
-            <div className="lg:col-span-5 space-y-4 no-print">
-              <div className="bg-stone-900 text-stone-100 rounded-xl px-4 py-2.5 flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                  Your Harvest & Transport Details
-                </span>
-                <span className="text-[11px] text-stone-400">
-                  Calculates your earnings automatically
+            <div className="lg:col-span-5 space-y-5 no-print">
+              <div className="bg-rural-forest text-white rounded-2xl px-5 py-3 flex items-center justify-between shadow-rural-soft">
+                <div className="flex items-center space-x-2">
+                  <Sprout className="w-4 h-4 text-rural-fresh" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-rural-mint">
+                    Your Harvest & Logistics Details
+                  </span>
+                </div>
+                <span className="text-[11px] text-rural-mint/80">
+                  Calculates automatically
                 </span>
               </div>
 
@@ -261,37 +394,22 @@ export const App: React.FC = () => {
                 onCropChange={handleCropChange}
               />
 
-              {/* 2. Harvest Details */}
+              {/* 2. Farm Location & Dynamic Mandi Discovery (Phase 5) */}
+              <LocationSelector
+                currentLocation={farmerLocation}
+                onLocationChange={handleLocationChange}
+              />
+
+              {/* 3. Harvest Details (including expected price) */}
               <HarvestDetails
                 inputs={inputs}
                 onChange={(updates) => updateInputs((prev) => ({ ...prev, ...updates }))}
                 error={validation.errors.quantity}
+                typicalPriceMin={currentCrop.typicalMarketPriceRange.min}
+                typicalPriceMax={currentCrop.typicalMarketPriceRange.max}
               />
 
-              {/* 3. Expected Selling Price */}
-              <ExpectedPriceForm
-                pricePerQuintal={currentExpectedPrice}
-                crop={currentCrop}
-                onChange={(price) =>
-                  updateInputs((prev) => ({ ...prev, expectedPricePerQuintal: price }))
-                }
-                error={validation.errors.expectedPrice}
-              />
-
-              {/* 4. How Will You Transport Your Crop? */}
-              <TransportConfigForm
-                transport={inputs.transport}
-                totalQuintals={totalQuintals}
-                onChange={(updates) =>
-                  updateInputs((prev) => ({
-                    ...prev,
-                    transport: { ...prev.transport, ...updates },
-                  }))
-                }
-                errors={validation.errors}
-              />
-
-              {/* 5. Crop Lost on the Way (Spoilage) */}
+              {/* 4. Expected Produce Loss */}
               <SpoilageConfigForm
                 spoilage={inputs.spoilage}
                 crop={currentCrop}
@@ -303,23 +421,64 @@ export const App: React.FC = () => {
                 }
                 error={validation.errors.spoilage}
               />
+
+              {/* 5. Transport Details */}
+              <TransportConfigForm
+                transport={inputs.transport}
+                totalQuintals={totalQuintals}
+                onChange={(updates) =>
+                  updateInputs((prev) => ({
+                    ...prev,
+                    transport: { ...prev.transport, ...updates },
+                  }))
+                }
+                errors={validation.errors}
+              />
             </div>
 
-            {/* Right Column: Ranked Markets, Split Harvest, Waterfall Chart */}
-            <div className="lg:col-span-7 space-y-6">
-              {/* Feasible Single-Market Ranking Table */}
+            {/* Right Column: Ranked Markets, Split Harvest, Waterfall Chart, Infeasible Options */}
+            <div className="lg:col-span-7 space-y-8">
+              {/* Phase 5: Dynamic National Mandi Discovery & Live AGMARKNET Prices */}
+              {isDiscovering && !dynamicResult ? (
+                <div className="bg-white rounded-3xl border border-rural-border p-12 text-center shadow-rural-soft">
+                  <Loader2 className="w-8 h-8 animate-spin text-rural-primary mx-auto mb-3" />
+                  <h3 className="font-serif font-bold text-lg text-rural-forest">
+                    Discovering Agricultural Mandis & Routing...
+                  </h3>
+                  <p className="text-xs text-rural-muted mt-1 max-w-md mx-auto">
+                    Computing real OSRM road mileage and querying daily modal rates from AGMARKNET for {farmerLocation.district}.
+                  </p>
+                </div>
+              ) : dynamicResult ? (
+                <DynamicMarketSection
+                  farmerLocation={farmerLocation}
+                  evaluations={dynamicResult.evaluatedMarkets}
+                  recommendedMarket={dynamicResult.recommendedMarket}
+                  closestFeasibleMarket={dynamicResult.closestFeasibleMarket}
+                  totalCandidatesFound={dynamicResult.totalCandidatesFound}
+                  sortOption={sortOption}
+                  filters={filters}
+                  onSortChange={setSortOption}
+                  onFilterChange={(newF) => setFilters((prev) => ({ ...prev, ...newF }))}
+                  onSelectBreakdown={handleSelectDynamicBreakdown}
+                  isLiveMode={isLiveMode}
+                  onToggleLiveMode={setIsLiveMode}
+                />
+              ) : null}
+
+              {/* Split-Harvest Optimization Section ("Should You Sell at One Market or More Than One?") */}
+              <SplitHarvestSection splitResult={splitResult} />
+
+              {/* Financial Waterfall Chart ("Where Your Money Goes") */}
+              <FinancialWaterfallChart bestMarket={ranking.bestMarket} />
+
+              {/* Baseline Regional Feasible Single-Market Ranking Table ("Markets Compared") */}
               <MarketRankingTable
                 feasibleMarkets={ranking.feasibleMarkets}
                 onSelectMarket={(m) => setSelectedBreakdownMarket(m)}
               />
 
-              {/* Split-Harvest Optimization Section */}
-              <SplitHarvestSection splitResult={splitResult} />
-
-              {/* Financial Waterfall Chart */}
-              <FinancialWaterfallChart bestMarket={ranking.bestMarket} />
-
-              {/* Infeasible Markets Section */}
+              {/* Infeasible Markets Section ("Markets That Cannot Buy Your Full Crop") */}
               <InfeasibleMarketsSection
                 infeasibleMarkets={ranking.infeasibleMarkets}
                 onSelectMarket={(m) => setSelectedBreakdownMarket(m)}

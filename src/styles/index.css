@@ -4,24 +4,35 @@
 
 @layer base {
   body {
-    @apply bg-warmbg-50 text-stone-900 antialiased selection:bg-emerald-200 selection:text-emerald-900;
+    @apply bg-rural-cream text-rural-charcoal antialiased selection:bg-rural-mint selection:text-rural-deep font-sans;
+  }
+
+  h1, h2, h3, .font-editorial {
+    @apply font-serif text-rural-deep tracking-tight;
   }
 }
 
-/* Custom subtle scrollbar */
+/* Custom subtle organic scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f1ee;
+  background: #F8F6EF;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #DCE5DA;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #176B49;
+}
+
+/* Subtle botanical pattern helper */
+.bg-botanical-pattern {
+  background-image: radial-gradient(#176B49 0.75px, transparent 0.75px);
+  background-size: 24px 24px;
+  opacity: 0.05;
 }
 
 /* Print optimization */
@@ -36,7 +47,7 @@
   }
   body {
     background: #ffffff !important;
-    color: #1c1917 !important;
+    color: #123D2C !important;
   }
   .no-print {
     display: none !important;
@@ -51,5 +62,10 @@
     page-break-inside: avoid;
     page-break-after: auto;
   }
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
 }
-

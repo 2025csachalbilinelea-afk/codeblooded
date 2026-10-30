@@ -1,56 +1,54 @@
 import React from 'react';
-import { ShieldCheck, Info, Scale } from 'lucide-react';
+import { ShieldCheck, Info, Scale, AlertCircle } from 'lucide-react';
+import { BrandLogo } from '../common/BrandLogo';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="bg-stone-900 border-t border-stone-800 text-stone-400 py-10 mt-16 text-sm no-print">
+    <footer className="bg-rural-deep border-t border-rural-deep text-white/70 py-12 mt-20 text-sm no-print">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 pb-8 border-b border-white/10">
           <div>
-            <div className="flex items-center space-x-2 text-stone-200 font-semibold mb-2">
-              <Scale className="w-4 h-4 text-emerald-400" />
+            <div className="flex items-center space-x-2 text-white font-serif font-bold mb-2">
+              <Scale className="w-4 h-4 text-rural-fresh" />
               <span>The HarvestRoute Principle</span>
             </div>
-            <p className="text-xs text-stone-400 leading-relaxed">
-              Distant agricultural markets frequently advertise inflated sticker prices to attract consignments.
-              HarvestRoute protects farmer livelihood by deducting the hidden realities: multi-trip diesel costs,
-              transit vibration losses, market cess, unloading charges, and strict buyer purchase ceilings.
+            <p className="text-xs text-white/70 leading-relaxed font-sans">
+              Distant agricultural markets often advertise higher prices, but longer trips can eat up profits through fuel expenses, road damage, and buyer purchase quotas. HarvestRoute helps you compare what you actually keep in your pocket.
             </p>
           </div>
 
           <div>
-            <div className="flex items-center space-x-2 text-stone-200 font-semibold mb-2">
-              <Info className="w-4 h-4 text-emerald-400" />
-              <span>Transparent Simulation Model</span>
+            <div className="flex items-center space-x-2 text-white font-serif font-bold mb-2">
+              <Info className="w-4 h-4 text-rural-fresh" />
+              <span>Transparent Calculations</span>
             </div>
-            <p className="text-xs text-stone-400 leading-relaxed">
-              All prices, distances, and capacities shown in this demonstration platform are generated using
-              configurable econometric models calibrated for 28+ crops across 4 perishability classes.
-              No fictional quotes are ever represented as live government APMC data.
+            <p className="text-xs text-white/70 leading-relaxed font-sans">
+              Every travel expense, market commission, and produce loss estimate is calculated openly. All regional market prices and quotas in this prototype are demonstration sample models to help evaluate selling options.
             </p>
           </div>
 
           <div>
-            <div className="flex items-center space-x-2 text-stone-200 font-semibold mb-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Architectural Integrity</span>
+            <div className="flex items-center space-x-2 text-white font-serif font-bold mb-2">
+              <ShieldCheck className="w-4 h-4 text-rural-fresh" />
+              <span>Reliable Decision Support</span>
             </div>
-            <p className="text-xs text-stone-400 leading-relaxed">
-              Built with modular TypeScript calculation engines decoupled from presentation state. Supports
-              positive and negative net margins, manual vs. multi-factor environmental spoilage models,
-              and capacity-constrained single and split harvest optimization.
+            <p className="text-xs text-white/70 leading-relaxed font-sans">
+              Powered by modular calculation engines that respect vehicle capacities, round-trip travel costs, and single-market vs. multi-market split-harvest optimization.
             </p>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-stone-800 flex flex-col sm:flex-row items-center justify-between text-xs text-stone-500">
-          <p>© 2026 HarvestRoute - Smart Agricultural Market Selection Platform.</p>
-          <p className="mt-2 sm:mt-0 font-medium text-stone-400">
-            Precision Agritech Decision Support System
-          </p>
+        <div className="flex flex-col sm:flex-row items-center justify-between text-xs text-white/50 gap-4">
+          <div className="flex items-center space-x-2">
+            <BrandLogo variant="light" size="sm" />
+            <span>— Precision Decision Support for Farmers</span>
+          </div>
+          <div className="flex items-center space-x-1.5 text-amber-300/80 text-center sm:text-right">
+            <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+            <span>Demonstration sample data only. Verify spot rates with your local mandi before dispatch.</span>
+          </div>
         </div>
       </div>
     </footer>
   );
 };
-
