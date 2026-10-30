@@ -16,7 +16,7 @@ import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { CropSelector } from './components/forms/CropSelector';
 import { HarvestDetails } from './components/forms/HarvestDetails';
-import { GradeDistributionForm } from './components/forms/GradeDistribution';
+import { ExpectedPriceForm } from './components/forms/ExpectedPriceForm';
 import { SpoilageConfigForm } from './components/forms/SpoilageConfig';
 import { TransportConfigForm } from './components/forms/TransportConfig';
 
@@ -26,10 +26,10 @@ import { MarketRankingTable } from './components/markets/MarketRankingTable';
 import { SplitHarvestSection } from './components/dashboard/SplitHarvestSection';
 import { InfeasibleMarketsSection } from './components/markets/InfeasibleMarketsSection';
 import { FinancialBreakdownModal } from './components/dashboard/FinancialBreakdownModal';
-import { SensitivityAnalysis } from './components/dashboard/SensitivityAnalysis';
 import { SplitHarvestModal } from './components/dashboard/SplitHarvestModal';
 import { FinancialWaterfallChart } from './components/charts/FinancialWaterfallChart';
 import { VerificationModal } from './components/dashboard/VerificationModal';
+import { MarketReportModal } from './components/dashboard/MarketReportModal';
 
 import { Split, ShieldCheck, AlertTriangle } from 'lucide-react';
 
@@ -40,6 +40,7 @@ const INITIAL_INPUTS: FarmerInputs = {
   harvestDate: new Date().toISOString().split('T')[0],
   maturity: 'optimal',
   originLocation: 'Navalgund Farm Gate, Dharwad Hub',
+  expectedPricePerQuintal: 2400,
   gradeDistribution: { A: 50, B: 35, C: 15 },
   spoilage: {
     mode: 'automatic',
@@ -62,8 +63,9 @@ const INITIAL_INPUTS: FarmerInputs = {
     },
     rentedVehicle: {
       rentalQuotationPerTrip: 3500,
+      rentalRatePerKm: 35,
       capacityQuintals: 30,
-      additionalChargesPerTrip: 400,
+      additionalChargesPerTrip: 0,
       rentalModel: 'distance_scaled',
     },
   },
@@ -75,6 +77,7 @@ export const App: React.FC = () => {
     useState<MarketCalculationResult | null>(null);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState<boolean>(false);
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState<boolean>(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
 
   // Selected crop profile
   const currentCrop = useMemo(() => getCropById(inputs.cropId), [inputs.cropId]);
@@ -94,7 +97,7 @@ export const App: React.FC = () => {
     [inputs, currentCrop, markets]
   );
 
-  // Highest Price vs Highest Net Return comparison (weighted by farmer's grade distribution)
+  // Highest Price vs Highest Net Return comparison
   const comparison = useMemo(
     () =>
       analyzeHighestPriceVsNetReturn(
@@ -105,7 +108,7 @@ export const App: React.FC = () => {
     [ranking, inputs.gradeDistribution]
   );
 
-  // Advanced Split-Harvest optimization
+  // Split-Harvest optimization
   const splitResult = useMemo(
     () =>
       optimizeSplitHarvest(
@@ -122,10 +125,13 @@ export const App: React.FC = () => {
 
   // Handlers
   const handleCropChange = (crop: CropProfile) => {
+    const defaultPrice = Math.round(
+      (crop.typicalMarketPriceRange.min + crop.typicalMarketPriceRange.max) / 2
+    );
     setInputs((prev) => ({
       ...prev,
       cropId: crop.id,
-      gradeDistribution: { ...crop.defaultGradeDistribution },
+      expectedPricePerQuintal: defaultPrice,
       maturity: crop.defaultFreshness,
     }));
   };
@@ -135,21 +141,18 @@ export const App: React.FC = () => {
   };
 
   const handlePrint = () => {
-    window.print();
+    setIsReportModalOpen(true);
   };
 
-  const handleFuelPriceChange = (newPrice: number) => {
-    setInputs((prev) => ({
-      ...prev,
-      transport: {
-        ...prev.transport,
-        ownVehicle: {
-          ...prev.transport.ownVehicle,
-          fuelPricePerLitre: newPrice,
-        },
-      },
-    }));
+  const updateInputs = (updater: (prev: FarmerInputs) => FarmerInputs) => {
+    setInputs(updater);
   };
+
+  const currentExpectedPrice =
+    inputs.expectedPricePerQuintal ??
+    Math.round(
+      (currentCrop.typicalMarketPriceRange.min + currentCrop.typicalMarketPriceRange.max) / 2
+    );
 
   return (
     <div className="min-h-screen flex flex-col bg-warmbg-50">
@@ -162,12 +165,12 @@ export const App: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Page Title & Context Header */}
+        {/* Page Title & Context Header in Simple English */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-stone-200/80 gap-3">
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                Decision Support Engine
+                Farmer Decision Guide
               </span>
               <span className="text-xs text-stone-500">•</span>
               <span className="text-xs text-stone-600 font-medium">
@@ -175,11 +178,11 @@ export const App: React.FC = () => {
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight mt-1">
-              Market Selection & Net Return Optimizer
+              Find the Best Market for Your Crop
             </h1>
             <p className="text-xs sm:text-sm text-stone-600 mt-1 max-w-3xl">
-              Calculate true in-pocket earnings across regional markets by factoring in transit
-              spoilage, fuel, vehicle capacity limits, handling, and regulated mandi fees.
+              Enter your harvest details below to see how much money you will keep after travel and
+              market expenses.
             </p>
           </div>
 
@@ -208,7 +211,7 @@ export const App: React.FC = () => {
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-stone-700 border border-stone-300 hover:bg-stone-50 transition-colors"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Engine Status: Active</span>
+              <span>Calculator Is Ready</span>
             </button>
           </div>
         </div>
@@ -230,25 +233,25 @@ export const App: React.FC = () => {
 
         {/* Dashboard Grid */}
         <div className="space-y-6">
-          {/* Section: Top Financial Metric Cards */}
+          {/* Section: Top Metric Cards */}
           <MetricCards
             bestMarket={ranking.bestMarket}
             totalHarvestQuintals={totalQuintals}
           />
 
-          {/* Section: Signature Twist - Highest Price vs Highest Net Return */}
+          {/* Section: Signature Comparison - Highest Price vs Highest Net Return */}
           <ComparisonCard comparison={comparison} />
 
           {/* Two-Column Responsive Layout: Farmer Inputs on Left, Results on Right */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Comprehensive Farmer Input Forms */}
+            {/* Left Column: Farmer Input Forms */}
             <div className="lg:col-span-5 space-y-4 no-print">
               <div className="bg-stone-900 text-stone-100 rounded-xl px-4 py-2.5 flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                  Farmer Dispatch Parameters
+                  Your Harvest & Transport Details
                 </span>
                 <span className="text-[11px] text-stone-400">
-                  Live recalculation on change
+                  Calculates your earnings automatically
                 </span>
               </div>
 
@@ -261,46 +264,48 @@ export const App: React.FC = () => {
               {/* 2. Harvest Details */}
               <HarvestDetails
                 inputs={inputs}
-                onChange={(updates) => setInputs((prev) => ({ ...prev, ...updates }))}
+                onChange={(updates) => updateInputs((prev) => ({ ...prev, ...updates }))}
                 error={validation.errors.quantity}
               />
 
-              {/* 3. Grade Distribution */}
-              <GradeDistributionForm
-                gradeDistribution={inputs.gradeDistribution}
-                totalQuintals={totalQuintals}
-                onChange={(dist) => setInputs((prev) => ({ ...prev, gradeDistribution: dist }))}
-                error={validation.errors.grades}
-              />
-
-              {/* 4. Spoilage Model */}
-              <SpoilageConfigForm
-                spoilage={inputs.spoilage}
+              {/* 3. Expected Selling Price */}
+              <ExpectedPriceForm
+                pricePerQuintal={currentExpectedPrice}
                 crop={currentCrop}
-                onChange={(updates) =>
-                  setInputs((prev) => ({
-                    ...prev,
-                    spoilage: { ...prev.spoilage, ...updates },
-                  }))
+                onChange={(price) =>
+                  updateInputs((prev) => ({ ...prev, expectedPricePerQuintal: price }))
                 }
-                error={validation.errors.spoilage}
+                error={validation.errors.expectedPrice}
               />
 
-              {/* 5. Transportation Economics */}
+              {/* 4. How Will You Transport Your Crop? */}
               <TransportConfigForm
                 transport={inputs.transport}
                 totalQuintals={totalQuintals}
                 onChange={(updates) =>
-                  setInputs((prev) => ({
+                  updateInputs((prev) => ({
                     ...prev,
                     transport: { ...prev.transport, ...updates },
                   }))
                 }
                 errors={validation.errors}
               />
+
+              {/* 5. Crop Lost on the Way (Spoilage) */}
+              <SpoilageConfigForm
+                spoilage={inputs.spoilage}
+                crop={currentCrop}
+                onChange={(updates) =>
+                  updateInputs((prev) => ({
+                    ...prev,
+                    spoilage: { ...prev.spoilage, ...updates },
+                  }))
+                }
+                error={validation.errors.spoilage}
+              />
             </div>
 
-            {/* Right Column: Ranked Markets, Split Harvest, Waterfall Chart & Analysis */}
+            {/* Right Column: Ranked Markets, Split Harvest, Waterfall Chart */}
             <div className="lg:col-span-7 space-y-6">
               {/* Feasible Single-Market Ranking Table */}
               <MarketRankingTable
@@ -318,14 +323,6 @@ export const App: React.FC = () => {
               <InfeasibleMarketsSection
                 infeasibleMarkets={ranking.infeasibleMarkets}
                 onSelectMarket={(m) => setSelectedBreakdownMarket(m)}
-              />
-
-              {/* Sensitivity & Break-Even Decision Matrix */}
-              <SensitivityAnalysis
-                bestMarket={ranking.bestMarket}
-                feasibleMarkets={ranking.feasibleMarkets}
-                currentFuelPrice={inputs.transport.ownVehicle.fuelPricePerLitre}
-                onFuelPriceChange={handleFuelPriceChange}
               />
             </div>
           </div>
@@ -349,6 +346,18 @@ export const App: React.FC = () => {
 
       {isVerificationModalOpen && (
         <VerificationModal onClose={() => setIsVerificationModalOpen(false)} />
+      )}
+
+      {isReportModalOpen && (
+        <MarketReportModal
+          inputs={inputs}
+          crop={currentCrop}
+          totalQuintals={totalQuintals}
+          ranking={ranking}
+          splitResult={splitResult}
+          comparison={comparison}
+          onClose={() => setIsReportModalOpen(false)}
+        />
       )}
 
       {/* Footer */}

@@ -29,7 +29,7 @@ export const SpoilageConfigForm: React.FC<SpoilageConfigProps> = ({
             <Thermometer className="w-4 h-4" />
           </div>
           <h2 className="text-sm font-semibold text-stone-900 uppercase tracking-wider">
-            4. Post-Harvest & Transit Spoilage Model
+            5. Crop Lost on the Way (Spoilage)
           </h2>
         </div>
 
@@ -44,7 +44,7 @@ export const SpoilageConfigForm: React.FC<SpoilageConfigProps> = ({
                 : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            Auto Environmental Model
+            Automatic Estimate
           </button>
           <button
             type="button"
@@ -55,7 +55,7 @@ export const SpoilageConfigForm: React.FC<SpoilageConfigProps> = ({
                 : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            Manual Percentage
+            Enter My Own %
           </button>
         </div>
       </div>

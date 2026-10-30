@@ -198,6 +198,7 @@ export function getSimulatedMarketsForCrop(crop: CropProfile): SimulatedMarket[]
         B: priceB,
         C: priceC,
       },
+      priceMultipliers: m.priceMultipliers,
       commissionFeePercent: m.commissionFeePercent,
       marketCessPercent: m.marketCessPercent,
       handlingChargePerQuintal: m.handlingChargePerQuintal,

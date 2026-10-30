@@ -24,13 +24,23 @@ export function validateFarmerInputs(inputs: FarmerInputs): ValidationResult {
     errors.quantity = 'Harvest quantity exceeds the demonstration system limit (50,000 units).';
   }
 
-  const { A = 0, B = 0, C = 0 } = inputs.gradeDistribution || {};
-  if (isNaN(A) || isNaN(B) || isNaN(C) || A < 0 || B < 0 || C < 0) {
-    errors.grades = 'Grade percentages cannot be negative or invalid.';
-  } else {
-    const gradeSum = A + B + C;
-    if (Math.abs(gradeSum - 100) > GRADE_DISTRIBUTION_TOLERANCE) {
-      errors.grades = `Grade percentages must total exactly 100% (currently ${gradeSum}%).`;
+  // Validate grade distribution if provided
+  if (inputs.gradeDistribution) {
+    const { A = 0, B = 0, C = 0 } = inputs.gradeDistribution;
+    if (isNaN(A) || isNaN(B) || isNaN(C) || A < 0 || B < 0 || C < 0) {
+      errors.grades = 'Grade percentages cannot be negative or invalid.';
+    } else {
+      const gradeSum = A + B + C;
+      if (Math.abs(gradeSum - 100) > GRADE_DISTRIBUTION_TOLERANCE) {
+        errors.grades = `Grade percentages must total exactly 100% (currently ${gradeSum}%).`;
+      }
+    }
+  }
+
+  // Validate expected price if provided
+  if (inputs.expectedPricePerQuintal !== undefined) {
+    if (isNaN(inputs.expectedPricePerQuintal) || inputs.expectedPricePerQuintal <= 0) {
+      errors.price = 'Expected selling price must be greater than zero.';
     }
   }
 
@@ -71,11 +81,17 @@ export function validateFarmerInputs(inputs: FarmerInputs): ValidationResult {
     if (isNaN(rented.capacityQuintals) || rented.capacityQuintals <= 0) {
       errors.vehicleCapacity = 'Rented vehicle capacity must be greater than zero.';
     }
-    if (isNaN(rented.rentalQuotationPerTrip) || rented.rentalQuotationPerTrip < 0) {
-      errors.rentalQuote = 'Rental quotation cannot be negative.';
-    }
-    if (isNaN(rented.additionalChargesPerTrip) || rented.additionalChargesPerTrip < 0) {
-      errors.additionalCharges = 'Additional charges cannot be negative.';
+    if (rented.rentalRatePerKm !== undefined) {
+      if (isNaN(rented.rentalRatePerKm) || rented.rentalRatePerKm <= 0) {
+        errors.rentalRate = 'Rental cost per kilometre must be greater than zero.';
+      }
+    } else {
+      if (isNaN(rented.rentalQuotationPerTrip) || rented.rentalQuotationPerTrip < 0) {
+        errors.rentalQuote = 'Rental quotation cannot be negative.';
+      }
+      if (isNaN(rented.additionalChargesPerTrip) || rented.additionalChargesPerTrip < 0) {
+        errors.additionalCharges = 'Additional charges cannot be negative.';
+      }
     }
   }
 

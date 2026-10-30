@@ -76,7 +76,8 @@ export interface RentedVehicleConfig {
   rentalQuotationPerTrip: number;
   capacityQuintals: number;
   additionalChargesPerTrip: number; // loading, unloading, permits
-  rentalModel?: 'distance_scaled' | 'flat'; // default distance_scaled
+  rentalModel?: 'distance_scaled' | 'flat' | 'per_km'; // default distance_scaled
+  rentalRatePerKm?: number; // Simplified rental cost per kilometre (₹/km)
 }
 
 export interface TransportConfig {
@@ -102,6 +103,11 @@ export interface SimulatedMarket {
   typicalWaitTimeHours: number;
   description: string;
   specialtyTag?: string;
+  priceMultipliers?: {
+    A: number;
+    B: number;
+    C: number;
+  };
   simulatedFlag: true;
 }
 
@@ -112,7 +118,8 @@ export interface FarmerInputs {
   harvestDate: string;
   maturity: MaturityFreshness;
   originLocation: string;
-  gradeDistribution: GradeDistribution;
+  expectedPricePerQuintal?: number; // Simplified buyer offer price entered by farmer
+  gradeDistribution?: GradeDistribution; // Optional for backward compatibility
   spoilage: SpoilageInputs;
   transport: TransportConfig;
 }

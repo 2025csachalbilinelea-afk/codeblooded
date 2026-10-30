@@ -23,11 +23,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onResetDefaults, onPrint, onTogg
                   Harvest<span className="text-emerald-400">Route</span>
                 </span>
                 <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700/50">
-                  Agri-Supply Engine
+                  Farmer's Guide
                 </span>
               </div>
               <p className="text-xs text-stone-400 hidden sm:block">
-                Know your best market before your produce leaves the farm
+                Know where you will earn the most money before leaving the farm
               </p>
             </div>
           </div>
@@ -37,8 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onResetDefaults, onPrint, onTogg
             {/* Prominent Simulated Data Indicator required by Problem Statement */}
             <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-amber-950/70 border border-amber-600/50 text-amber-300 text-xs font-medium">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="hidden md:inline">Simulated Demonstration Data</span>
-              <span className="md:hidden">Simulated</span>
+              <span className="hidden md:inline">Sample Prices — Check Before Selling</span>
+              <span className="md:hidden">Sample Prices</span>
             </div>
 
             {onToggleVerification && (
@@ -49,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onResetDefaults, onPrint, onTogg
                 title="View automated verification tests"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Engine Tests</span>
+                <span>Calculator Is Ready</span>
               </button>
             )}
 

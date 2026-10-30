@@ -167,6 +167,51 @@ export function calculateTransportationCost(
       };
     }
 
+    if (rented.rentalRatePerKm !== undefined && rented.rentalRatePerKm > 0) {
+      if (isNaN(rented.rentalRatePerKm) || rented.rentalRatePerKm < 0) {
+        return {
+          totalCost: 0,
+          tripsCount: 0,
+          totalDistanceKm: 0,
+          fuelCost: 0,
+          maintenanceCost: 0,
+          driverCost: 0,
+          tollsAndOtherCost: 0,
+          rentalCharges: 0,
+          costPerQuintal: 0,
+          isFeasible: false,
+          feasibilityReason: 'Rental rate per kilometre cannot be negative.',
+        };
+      }
+
+      const tripsCount = Math.max(1, Math.ceil(quantityQuintals / rented.capacityQuintals));
+      const totalDistanceKm = tripsCount * distanceKm * 2; // round-trip distance
+
+      let isFeasible = true;
+      let feasibilityReason: string | undefined;
+      if (tripsCount > 4 && distanceKm > 80) {
+        isFeasible = false;
+        feasibilityReason = `Consignment requires ${tripsCount} rental trips over ${distanceKm} km, which is practically infeasible for single-day delivery.`;
+      }
+
+      const totalRentalCost = Math.round(totalDistanceKm * rented.rentalRatePerKm);
+      const costPerQuintal = quantityQuintals > 0 ? Number((totalRentalCost / quantityQuintals).toFixed(2)) : 0;
+
+      return {
+        totalCost: totalRentalCost,
+        tripsCount,
+        totalDistanceKm,
+        fuelCost: 0,
+        maintenanceCost: 0,
+        driverCost: 0,
+        tollsAndOtherCost: 0,
+        rentalCharges: totalRentalCost,
+        costPerQuintal,
+        isFeasible,
+        feasibilityReason,
+      };
+    }
+
     if (isNaN(rented.rentalQuotationPerTrip) || rented.rentalQuotationPerTrip < 0) {
       return {
         totalCost: 0,

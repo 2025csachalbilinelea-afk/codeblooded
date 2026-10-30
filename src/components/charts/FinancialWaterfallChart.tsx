@@ -13,7 +13,7 @@ export const FinancialWaterfallChart: React.FC<FinancialWaterfallChartProps> = (
 
   const data = [
     {
-      category: 'Gross Sales',
+      category: 'Total Selling Money',
       amount: bestMarket.grossRevenue,
       type: 'revenue',
       fill: '#15803d', // emerald-700
@@ -25,13 +25,13 @@ export const FinancialWaterfallChart: React.FC<FinancialWaterfallChartProps> = (
       fill: '#dc2626', // rose-600
     },
     {
-      category: 'Mandi Fees',
+      category: 'Market Charges',
       amount: -bestMarket.totalMarketFees,
       type: 'expense',
       fill: '#d97706', // amber-600
     },
     {
-      category: 'Net Earnings',
+      category: 'Money You Keep',
       amount: bestMarket.netReturn,
       type: bestMarket.netReturn >= 0 ? 'profit' : 'loss',
       fill: bestMarket.netReturn >= 0 ? '#1b4332' : '#991b1b', // forest green or dark red
@@ -47,10 +47,10 @@ export const FinancialWaterfallChart: React.FC<FinancialWaterfallChartProps> = (
           </div>
           <div>
             <h3 className="text-base font-bold text-stone-900">
-              Financial Waterfall for Recommended Market ({bestMarket.market.name})
+              Where Your Selling Money Goes ({bestMarket.market.name})
             </h3>
             <p className="text-xs text-stone-500">
-              Visualizing value erosion: Gross selling proceeds reduced by multi-trip logistics and regulated mandi deductions.
+              How total selling money is reduced by travel costs and market charges to give your actual take-home earnings.
             </p>
           </div>
         </div>
@@ -64,7 +64,7 @@ export const FinancialWaterfallChart: React.FC<FinancialWaterfallChartProps> = (
           >
             <XAxis
               dataKey="category"
-              tick={{ fill: '#44403c', fontSize: 12, fontWeight: 500 }}
+              tick={{ fill: '#44403c', fontSize: 11, fontWeight: 500 }}
               axisLine={{ stroke: '#e7e5e4' }}
               tickLine={false}
             />
@@ -95,7 +95,7 @@ export const FinancialWaterfallChart: React.FC<FinancialWaterfallChartProps> = (
 
       <div className="grid grid-cols-4 gap-2 pt-3 border-t border-stone-100 text-center text-xs">
         <div>
-          <span className="text-[10px] text-stone-400 uppercase font-semibold block">Gross Sales</span>
+          <span className="text-[10px] text-stone-400 uppercase font-semibold block">Total Selling Money</span>
           <span className="font-bold text-emerald-700">{formatINR(bestMarket.grossRevenue)}</span>
         </div>
         <div>
@@ -103,15 +103,16 @@ export const FinancialWaterfallChart: React.FC<FinancialWaterfallChartProps> = (
           <span className="font-bold text-rose-600">-{formatINR(bestMarket.transportationCost)}</span>
         </div>
         <div>
-          <span className="text-[10px] text-stone-400 uppercase font-semibold block">Mandi Deductions</span>
+          <span className="text-[10px] text-stone-400 uppercase font-semibold block">Market Charges</span>
           <span className="font-bold text-amber-600">-{formatINR(bestMarket.totalMarketFees)}</span>
         </div>
         <div>
-          <span className="text-[10px] text-stone-400 uppercase font-semibold block">Realized In-Pocket</span>
-          <span className="font-bold text-emerald-900">{formatINR(bestMarket.netReturn)}</span>
+          <span className="text-[10px] text-stone-400 uppercase font-semibold block">Money You Keep</span>
+          <span className={`font-bold ${bestMarket.netReturn >= 0 ? 'text-emerald-900' : 'text-rose-700'}`}>
+            {formatINR(bestMarket.netReturn)}
+          </span>
         </div>
       </div>
     </div>
   );
 };
-

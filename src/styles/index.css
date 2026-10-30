@@ -24,12 +24,32 @@
   background: #94a3b8;
 }
 
+/* Print optimization */
+.print-only {
+  display: none;
+}
+
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  body {
+    background: #ffffff !important;
+    color: #1c1917 !important;
+  }
   .no-print {
     display: none !important;
   }
   .print-only {
     display: block !important;
+  }
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
   }
 }
 

@@ -62,6 +62,7 @@ export function optimizeSplitHarvest(
     'Transit spoilage and unloading waiting times are computed independently for each market journey.',
     'Statutory market fees (APMC commission %, cess %, hamali per quintal, gate fee) apply per receiving mandi.',
     'Total dispatched volume strictly equals the harvested quantity before destination physical losses.',
+    'An operational complexity buffer of ₹250 is applied: multi-market split is recommended only when net profit exceeds the best single-market option by at least ₹250 to justify multiple trips and logistics coordination. This is a configurable decision-support threshold, not a universal statutory rule.',
   ];
 
   // Baseline single-market metrics
@@ -516,9 +517,7 @@ export function optimizeSplitHarvest(
 
   // Bounded search limitation disclosure
   const searchLimitationNotice =
-    plansEvaluated > 150
-      ? `Evaluated ${plansEvaluated} candidate route permutations with a deterministic ${stepSize} Qtl discretization step. Result represents the highest net return plan identified within search boundaries.`
-      : undefined;
+    `Evaluated ${plansEvaluated} candidate route permutations with a ${stepSize} Qtl discretization step and capacity boundary anchors. Result represents the highest net return plan identified within search boundaries (discretized bounded search; does not claim an unconstrained continuous mathematical global optimum).`;
 
   const totalSplitNet = bestSplitPlan?.planTotals.totalNetReturn || 0;
   const singleBestNet = baselineTotals?.totalNetReturn || 0;

@@ -6,7 +6,6 @@ import {
   Trophy,
   CheckCircle2,
   AlertTriangle,
-  ArrowRight,
   TrendingUp,
   TrendingDown,
   Info,
@@ -15,7 +14,6 @@ import {
   Ban,
   ChevronDown,
   ChevronUp,
-  HelpCircle,
 } from 'lucide-react';
 
 interface SplitHarvestSectionProps {
@@ -68,14 +66,14 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-base sm:text-lg font-bold text-stone-900 tracking-tight">
-                Split-Harvest Optimization
+                Compare Selling at One or More Markets
               </h2>
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Multi-Route Engine
+                Split Option
               </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Evaluate multi-destination consignments to capitalize on high-price quotas vs single-market consolidation.
+              See if dividing your harvest between two markets earns more money than selling everything at one market.
             </p>
           </div>
         </div>
@@ -85,17 +83,17 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
           {isSplitRecommended ? (
             <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-800 text-white shadow-sm">
               <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-              <span>Recommended Strategy: Split Harvest</span>
+              <span>We Recommend: Split Harvest</span>
             </span>
           ) : isSingleRecommended ? (
             <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-stone-800 text-white shadow-sm">
               <Trophy className="w-4 h-4 text-amber-400" />
-              <span>Recommended Strategy: Single Market</span>
+              <span>We Recommend: Single Market</span>
             </span>
           ) : (
             <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-800 text-white shadow-sm">
               <Ban className="w-4 h-4" />
-              <span>No Feasible Plan Available</span>
+              <span>No Feasible Selling Plan</span>
             </span>
           )}
         </div>
@@ -112,22 +110,22 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center space-x-1">
               <Building2 className="w-3.5 h-3.5" />
-              <span>Single-Market Best Option</span>
+              <span>Best Single Market</span>
             </span>
             {isSingleRecommended && (
               <span className="text-[10px] bg-emerald-700 text-white font-bold px-2 py-0.2 rounded">
-                Optimal
+                Recommended
               </span>
             )}
           </div>
           <div className="text-base font-bold text-stone-900 truncate">
-            {baselineSingleMarket ? baselineSingleMarket.market.name : 'No Single Destination Feasible'}
+            {baselineSingleMarket ? baselineSingleMarket.market.name : 'No Market Can Buy All'}
           </div>
           <div className="text-xl font-bold text-stone-900 mt-1">
             {baselineTotals ? formatINR(baselineTotals.totalNetReturn) : '—'}
           </div>
           <p className="text-[11px] text-stone-500 mt-0.5">
-            {baselineTotals ? `${formatINR(baselineTotals.netReturnPerQuintal)} / Qtl net margin` : 'Exceeds market purchase ceilings'}
+            {baselineTotals ? `${formatINR(baselineTotals.netReturnPerQuintal)} / Qtl money kept` : 'Exceeds market buying limit'}
           </p>
         </div>
 
@@ -140,11 +138,11 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center space-x-1">
               <Split className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Split-Harvest Best Plan</span>
+              <span>Best Split Plan</span>
             </span>
             {isSplitRecommended && (
               <span className="text-[10px] bg-emerald-700 text-white font-bold px-2 py-0.2 rounded">
-                Optimal (+Profit)
+                Recommended (+Extra Money)
               </span>
             )}
           </div>
@@ -157,7 +155,7 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
             {hasFeasibleSplit ? formatINR(planTotals.totalNetReturn) : '—'}
           </div>
           <p className="text-[11px] text-stone-500 mt-0.5">
-            {hasFeasibleSplit ? `${formatINR(planTotals.netReturnPerQuintal)} / Qtl net margin` : 'Capacity or order limits unmet'}
+            {hasFeasibleSplit ? `${formatINR(planTotals.netReturnPerQuintal)} / Qtl money kept` : 'Cannot meet market requirements'}
           </p>
         </div>
 
@@ -176,29 +174,29 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
               ) : (
                 <TrendingDown className="w-3.5 h-3.5 text-amber-400" />
               )}
-              <span>Splitting Net Gain</span>
+              <span>Extra Money from Splitting</span>
             </span>
           </div>
           <div className="text-2xl font-bold tracking-tight">
             {isNoneFeasible
-              ? 'Infeasible'
+              ? 'Not Possible'
               : !baselineSingleMarket && hasFeasibleSplit
-              ? 'Only Feasible Pick'
+              ? 'Only Working Option'
               : netGainFromSplitting >= 0
               ? `+${formatINR(netGainFromSplitting)}`
               : `-${formatINR(Math.abs(netGainFromSplitting))}`}
           </div>
           <p className="text-xs text-stone-300 mt-0.5">
             {isSplitAdvantageous
-              ? `+${formatINR(netGainPerQuintal)}/Qtl gained by splitting`
+              ? `+${formatINR(netGainPerQuintal)}/Qtl extra money by splitting`
               : isSingleRecommended
-              ? `Single market saves ${formatINR(Math.abs(netGainFromSplitting))} in duplicate transit`
-              : 'No allocation possible'}
+              ? `Selling at one market saves ${formatINR(Math.abs(netGainFromSplitting))} in extra travel costs`
+              : 'No valid plan found'}
           </p>
         </div>
       </div>
 
-      {/* Dynamic Explanation Rationale */}
+      {/* Why We Recommend This Market */}
       <div className={`p-4 rounded-xl border text-xs sm:text-sm leading-relaxed mb-4 ${
         isSplitRecommended
           ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
@@ -208,7 +206,7 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
       }`}>
         <div className="font-semibold text-xs uppercase tracking-wider mb-1 flex items-center space-x-1.5">
           <Info className="w-3.5 h-3.5" />
-          <span>Decision Rationale</span>
+          <span>Why We Recommend This Market</span>
         </div>
         <p className="font-normal">{explanation}</p>
         <p className="text-xs text-stone-500 mt-1.5 font-medium">{strategyRationale}</p>
@@ -220,14 +218,14 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-stone-50 border-b border-stone-200 text-stone-600 font-semibold uppercase tracking-wider text-[11px]">
-                <th className="py-2.5 px-3">Route Destination</th>
-                <th className="py-2.5 px-3">Dispatched Qtl</th>
-                <th className="py-2.5 px-3">Transit Spoilage</th>
-                <th className="py-2.5 px-3">Saleable Qtl</th>
-                <th className="py-2.5 px-3">Gross Sales</th>
+                <th className="py-2.5 px-3">Market</th>
+                <th className="py-2.5 px-3">Amount Sent</th>
+                <th className="py-2.5 px-3">Crop Lost on Way</th>
+                <th className="py-2.5 px-3">Crop Available to Sell</th>
+                <th className="py-2.5 px-3">Total Selling Money</th>
                 <th className="py-2.5 px-3">Transport Cost</th>
-                <th className="py-2.5 px-3">Mandi Fees</th>
-                <th className="py-2.5 px-4 text-right">Net Return</th>
+                <th className="py-2.5 px-3">Market Charges</th>
+                <th className="py-2.5 px-4 text-right">Money You Keep</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 font-medium">
@@ -235,10 +233,10 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
                 <tr key={alloc.market.id} className="hover:bg-warmbg-50 transition-colors">
                   <td className="py-3 px-3">
                     <div className="font-bold text-stone-900">
-                      Route #{idx + 1}: {alloc.market.name}
+                      Market #{idx + 1}: {alloc.market.name}
                     </div>
                     <div className="text-[10px] text-stone-500">
-                      {alloc.market.locationName} • {alloc.market.distanceKm} km haul
+                      {alloc.market.locationName} • {alloc.market.distanceKm} km away
                     </div>
                   </td>
                   <td className="py-3 px-3 font-bold text-stone-800 whitespace-nowrap">
@@ -281,7 +279,7 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
               {/* Totals Row */}
               <tr className="bg-stone-100/80 font-bold border-t-2 border-stone-300 text-stone-900">
                 <td className="py-3 px-3 uppercase text-[11px] tracking-wider text-stone-700">
-                  Total Split Plan
+                  Total for Both Markets
                 </td>
                 <td className="py-3 px-3 text-emerald-900">
                   {planTotals.totalAllocatedQuintals.toFixed(1)} Qtl
@@ -306,7 +304,7 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
                     {formatINR(planTotals.totalNetReturn)}
                   </span>
                   <span className="text-[10px] text-stone-600 block font-normal">
-                    {formatINR(planTotals.netReturnPerQuintal)} / Qtl Net Realization
+                    {formatINR(planTotals.netReturnPerQuintal)} / Qtl Money Kept
                   </span>
                 </td>
               </tr>
@@ -326,7 +324,7 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
           >
             <span className="flex items-center space-x-1.5">
               <Truck className="w-3.5 h-3.5 text-stone-500" />
-              <span>Multi-Route Transport & Modeling Assumptions</span>
+              <span>How We Calculate Travel Costs for Multiple Routes</span>
             </span>
             {showAssumptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -356,7 +354,7 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
             >
               <span className="flex items-center space-x-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                <span>Rejected Infeasible Route Combinations ({rejectedPlans.length})</span>
+                <span>Other Selling Options That Will Not Work ({rejectedPlans.length})</span>
               </span>
               {showRejected ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -365,13 +363,13 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
                 {rejectedPlans.map((rej, i) => (
                   <div key={i} className="p-2 rounded bg-stone-50 border border-stone-200">
                     <div className="font-semibold text-stone-800">
-                      Candidate Route: {rej.marketNames.join(' + ')}
+                      Route Tried: {rej.marketNames.join(' + ')}
                     </div>
                     <div className="text-stone-500 text-[10px] mt-0.5">
-                      Proposed Quantities: {rej.proposedAllocations.map((q) => `${q.toFixed(1)} Qtl`).join(' / ')}
+                      Amounts Sent: {rej.proposedAllocations.map((q) => `${q.toFixed(1)} Qtl`).join(' / ')}
                     </div>
                     <div className="text-rose-700 mt-1 font-medium">
-                      Rejection Reason: {rej.rejectionReason}
+                      Why It Will Not Work: {rej.rejectionReason}
                     </div>
                   </div>
                 ))}
@@ -383,4 +381,3 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
     </div>
   );
 };
-

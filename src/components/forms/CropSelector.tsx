@@ -67,7 +67,7 @@ export const CropSelector: React.FC<CropSelectorProps> = ({ selectedCrop, onCrop
             <Sprout className="w-4 h-4" />
           </div>
           <h2 className="text-sm font-semibold text-stone-900 uppercase tracking-wider">
-            1. Crop Selection & Profile
+            1. Select Your Crop
           </h2>
         </div>
         <span

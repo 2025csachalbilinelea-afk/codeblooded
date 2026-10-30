@@ -20,12 +20,12 @@ export const SplitHarvestModal: React.FC<SplitHarvestModalProps> = ({ splitResul
             <div className="flex items-center space-x-2">
               <Split className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-                P1 Advanced Multi-Market Optimization
+                Selling at Two Markets
               </span>
             </div>
-            <h2 className="text-lg font-bold text-white mt-1">Split-Harvest Route Allocator</h2>
+            <h2 className="text-lg font-bold text-white mt-1">Plan for Selling at Two Markets</h2>
             <p className="text-xs text-stone-400">
-              Allocating volume between a high-price quota-restricted boutique hub and a secondary high-capacity mandi.
+              Dividing your harvest to get higher prices while respecting market purchase limits.
             </p>
           </div>
           <button

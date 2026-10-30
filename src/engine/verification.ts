@@ -517,5 +517,52 @@ export function runEngineVerification(): VerificationTestResult[] {
     });
   }
 
+  // Scenario 18: Simplified Expected Selling Price
+  {
+    const inputsWithExpectedPrice: FarmerInputs = {
+      ...defaultInputs,
+      expectedPricePerQuintal: 2500,
+      gradeDistribution: undefined,
+    };
+    const rankingExpected = rankMarketsByNetReturn(inputsWithExpectedPrice, tomato, markets);
+    const hasValidResults =
+      rankingExpected.feasibleMarkets.length > 0 &&
+      rankingExpected.feasibleMarkets.every((m) => m.grossRevenue > 0 && m.netReturn !== 0);
+
+    results.push({
+      test: '18. Expected selling price model: Correctly scales expected price without requiring grade distribution',
+      passed: hasValidResults,
+      details: `Feasible destinations evaluated: ${rankingExpected.feasibleMarkets.length} | Winner: ${rankingExpected.bestMarket?.market.name} (Gross: ₹${rankingExpected.bestMarket?.grossRevenue.toLocaleString('en-IN')}, Net: ₹${rankingExpected.bestMarket?.netReturn.toLocaleString('en-IN')})`,
+    });
+  }
+
+  // Scenario 19: Simplified Rented Transport Economics
+  {
+    const inputsRentedKm: FarmerInputs = {
+      ...defaultInputs,
+      transport: {
+        type: 'rented',
+        ownVehicle: defaultInputs.transport.ownVehicle,
+        rentedVehicle: {
+          rentalQuotationPerTrip: 0,
+          rentalRatePerKm: 35,
+          capacityQuintals: 30,
+          additionalChargesPerTrip: 0,
+          rentalModel: 'distance_scaled',
+        },
+      },
+    };
+    const kisan = markets.find((m) => m.id === 'kisan-gramin') || markets[0];
+    const calc = calculateMarketNetReturn(inputsRentedKm, tomato, kisan);
+    const expectedCost = 1 * (kisan.distanceKm * 2) * 35;
+    const isCostExact = calc.transportationCost === expectedCost;
+
+    results.push({
+      test: '19. Simplified rented transport model: Accurately computes round-trip distance * per-km rate without duplicate charges',
+      passed: isCostExact,
+      details: `Trips: ${calc.transportTrips} | Distance: ${kisan.distanceKm} km | Rate: ₹35/km | Calculated Cost: ₹${calc.transportationCost.toLocaleString('en-IN')} (Expected: ₹${expectedCost.toLocaleString('en-IN')})`,
+    });
+  }
+
   return results;
 }

@@ -22,7 +22,7 @@ export const HarvestDetails: React.FC<HarvestDetailsProps> = ({ inputs, onChange
             <Scale className="w-4 h-4" />
           </div>
           <h2 className="text-sm font-semibold text-stone-900 uppercase tracking-wider">
-            2. Harvest Volume & Origin
+            2. Harvest Details
           </h2>
         </div>
         <div className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
@@ -34,7 +34,7 @@ export const HarvestDetails: React.FC<HarvestDetailsProps> = ({ inputs, onChange
         {/* Quantity and Unit in linked group */}
         <div className="sm:col-span-2">
           <label className="block text-xs font-semibold text-stone-700 mb-1">
-            Total Consignment Harvested
+            Total Harvested Quantity
           </label>
           <div className="flex rounded-lg shadow-sm">
             <input
@@ -42,7 +42,7 @@ export const HarvestDetails: React.FC<HarvestDetailsProps> = ({ inputs, onChange
               min="0.1"
               step="any"
               value={inputs.quantity || ''}
-              onChange={(e) => onChange({ quantity: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => onChange({ quantity: Math.max(0, parseFloat(e.target.value) || 0) })}
               placeholder="e.g. 20"
               className={`w-full text-sm bg-warmbg-50 border ${
                 error ? 'border-rose-400 focus:ring-rose-500' : 'border-stone-300 focus:ring-emerald-600'

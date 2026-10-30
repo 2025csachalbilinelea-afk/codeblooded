@@ -40,14 +40,15 @@ export function calculateMarketNetReturn(
   }
 
   // Grade distribution validation
-  const rawA = inputs.gradeDistribution?.A ?? 0;
+  const hasGrades = !!inputs.gradeDistribution;
+  const rawA = inputs.gradeDistribution?.A ?? (hasGrades ? 0 : 100);
   const rawB = inputs.gradeDistribution?.B ?? 0;
   const rawC = inputs.gradeDistribution?.C ?? 0;
   const hasNegativeGrade = rawA < 0 || rawB < 0 || rawC < 0 || isNaN(rawA) || isNaN(rawB) || isNaN(rawC);
   const totalGradePct = rawA + rawB + rawC;
   const isGradeDistributionValid = !hasNegativeGrade && Math.abs(totalGradePct - 100) <= GRADE_DISTRIBUTION_TOLERANCE;
 
-  if (!isGradeDistributionValid) {
+  if (hasGrades && !isGradeDistributionValid) {
     feasibilityReasons.push(
       `Grade percentages must total exactly 100% (currently ${totalGradePct}%).`
     );
@@ -119,9 +120,20 @@ export function calculateMarketNetReturn(
   };
 
   // 3. Gross Revenue by Grade
-  const priceA = market.pricesPerQuintal?.A ?? 0;
-  const priceB = market.pricesPerQuintal?.B ?? 0;
-  const priceC = market.pricesPerQuintal?.C ?? 0;
+  let priceA = market.pricesPerQuintal?.A ?? 0;
+  let priceB = market.pricesPerQuintal?.B ?? 0;
+  let priceC = market.pricesPerQuintal?.C ?? 0;
+
+  if (inputs.expectedPricePerQuintal !== undefined && inputs.expectedPricePerQuintal > 0) {
+    const defaultMidPrice = Math.round((crop.typicalMarketPriceRange.min + crop.typicalMarketPriceRange.max) / 2);
+    const multA = market.priceMultipliers?.A ?? (priceA > 0 && defaultMidPrice > 0 ? priceA / defaultMidPrice : 1.0);
+    const multB = market.priceMultipliers?.B ?? (priceB > 0 && defaultMidPrice > 0 ? priceB / defaultMidPrice : 0.88);
+    const multC = market.priceMultipliers?.C ?? (priceC > 0 && defaultMidPrice > 0 ? priceC / defaultMidPrice : 0.72);
+
+    priceA = Math.round(inputs.expectedPricePerQuintal * multA);
+    priceB = Math.round(inputs.expectedPricePerQuintal * multB);
+    priceC = Math.round(inputs.expectedPricePerQuintal * multC);
+  }
 
   const gradeRevenue: Record<Grade, number> = {
     A: Math.round(gradeSaleableQuantities.A * priceA),
@@ -165,11 +177,11 @@ export function calculateMarketNetReturn(
     );
   }
 
-  const hasValidQuote =
-    market.pricesPerQuintal &&
-    market.pricesPerQuintal.A > 0 &&
-    (normB <= 0 || (market.pricesPerQuintal.B && market.pricesPerQuintal.B > 0)) &&
-    (normA + normB >= 100 || (market.pricesPerQuintal.C && market.pricesPerQuintal.C > 0));
+  const hasValidQuote = priceA > 0; // quote check
+
+
+
+
 
   if (!hasValidQuote) {
     feasibilityReasons.push('No active quotation available for this crop at this market.');

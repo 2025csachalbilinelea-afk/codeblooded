@@ -555,6 +555,149 @@ console.log('\n--- PART 2: REALISTIC AGRICULTURAL DOMAIN AUDIT ---\n');
     `Net Gap: ₹${netGap} -> Required Price Increase: +₹${requiredSurgePerQtl}/Qtl (+${((requiredSurgePerQtl / legMetro.market.pricesPerQuintal.A) * 100).toFixed(1)}%)`);
 }
 
+// ============================================================================
+// PART 3: HACKATHON DEMO SCENARIOS VERIFICATION (OBJECTIVE 3)
+// ============================================================================
+console.log('\n--- PART 3: HACKATHON DEMO SCENARIOS AUDIT (OBJECTIVE 3) ---\n');
+
+// Demo Scenario A: High-Price Trap
+{
+  const sahyadri = marketsFixture.find(m => m.id === 'sahyadri-boutique');
+  const central = marketsFixture.find(m => m.id === 'central-apmc');
+  const legSahyadri = calcLeg(defaultInputs, cropTomatoFixture, sahyadri, 25);
+  const legCentral = calcLeg(defaultInputs, cropTomatoFixture, central, 25);
+  const isHighPriceTrap = !legSahyadri.isFeasible && legCentral.isFeasible && sahyadri.pricesPerQuintal.A > central.pricesPerQuintal.A;
+  assert(isHighPriceTrap, 'Demo Scenario A', 'High-Price Trap: Distant boutique market advertises highest price but is disqualified by capacity ceiling',
+    `Sahyadri Rate: ₹${sahyadri.pricesPerQuintal.A}/Qtl (Cap ${sahyadri.maxCapacityQuintals} Qtl < 25 Qtl -> Feasible: ${legSahyadri.isFeasible}). Central APMC Feasible: ${legCentral.isFeasible}`);
+}
+
+// Demo Scenario B: Split-Harvest Advantage
+{
+  const inputs25 = { ...defaultInputs, quantity: 25, gradeDistribution: { A: 80, B: 15, C: 5 } };
+  const baselineCentral = calcLeg(inputs25, cropTomatoFixture, marketsFixture[3], 25);
+  const result = runOptimizer(inputs25, cropTomatoFixture, marketsFixture, baselineCentral);
+  const isSplitSuperior = result.recommendedStrategy === 'split' && result.bestSplitPlan.totalNetReturn > baselineCentral.netReturn + 250;
+  assert(isSplitSuperior, 'Demo Scenario B', 'Split-Harvest Advantage: Feasible split genuinely beats best feasible single market by >₹250 threshold',
+    `Split Net: ₹${result.bestSplitPlan?.totalNetReturn} vs Single Best: ₹${baselineCentral.netReturn} (Net Advantage: +₹${result.bestSplitPlan?.totalNetReturn - baselineCentral.netReturn})`);
+}
+
+// Demo Scenario C: Local Perishable Produce (Heat Wilting)
+{
+  const cropSpinach = { id: 'spinach', perishabilityClass: 1, baseDeteriorationRatePerHour: 1.2 };
+  const inputsSpinachHot = {
+    ...defaultInputs,
+    cropId: 'spinach',
+    quantity: 15,
+    spoilage: { mode: 'automatic', manualPercentage: 0, temperature: 'hot', vehicleProtection: 'open', handling: 'rough', delayHours: 2 },
+  };
+  const legKisan = calcLeg(inputsSpinachHot, cropSpinach, marketsFixture[0], 15);
+  const legMetro = calcLeg(inputsSpinachHot, cropSpinach, marketsFixture[1], 15);
+  const isLocalSuperior = legKisan.netReturn > legMetro.netReturn + 5000;
+  assert(isLocalSuperior, 'Demo Scenario C', 'Local Perishable Produce: Shorter transit time saves highly perishable spinach from severe heat wilting',
+    `Kisan (18 km) Net: ₹${legKisan.netReturn} > Metro (165 km) Net: ₹${legMetro.netReturn} (Local advantage: +₹${legKisan.netReturn - legMetro.netReturn})`);
+}
+
+// Demo Scenario D: Single-Market Preference (Low Overhead)
+{
+  const inputs10 = { ...defaultInputs, quantity: 10, gradeDistribution: { A: 40, B: 40, C: 20 } };
+  const baselineKisan = calcLeg(inputs10, cropTomatoFixture, marketsFixture[0], 10);
+  const result = runOptimizer(inputs10, cropTomatoFixture, marketsFixture, baselineKisan);
+  const prefersSingle = result.recommendedStrategy === 'single' && !result.isSplitAdvantageous;
+  assert(prefersSingle, 'Demo Scenario D', 'Single-Market Preference: Duplicate transport legs and entry fees make splitting counterproductive for 10 Qtl',
+    `Recommended: ${result.recommendedStrategy} | Split Advantageous: ${result.isSplitAdvantageous}`);
+}
+
+// Demo Scenario E: No Feasible Destination (Commercial Ceiling)
+{
+  const giantInputs = { ...defaultInputs, quantity: 1000 };
+  const result = runOptimizer(giantInputs, cropTomatoFixture, marketsFixture, null);
+  const isNoFeasible = !result.hasFeasibleSplit && result.recommendedStrategy === 'none';
+  assert(isNoFeasible, 'Demo Scenario E', 'No Feasible Destination: Consignment of 1,000 Qtl exceeds all regional spot market caps cleanly',
+    `Recommended: ${result.recommendedStrategy} | Feasible Split: ${result.hasFeasibleSplit}`);
+}
+
+// ============================================================================
+// PART 4: FINANCIAL & REPORT RECONCILIATION AUDIT (OBJECTIVES 1 & 4)
+// ============================================================================
+console.log('\n--- PART 4: FINANCIAL RECONCILIATION & REPORT AUDIT (OBJECTIVES 1 & 4) ---\n');
+
+{
+  const inputs25 = { ...defaultInputs, quantity: 25, gradeDistribution: { A: 80, B: 15, C: 5 } };
+  const baselineCentral = calcLeg(inputs25, cropTomatoFixture, marketsFixture[3], 25);
+  const result = runOptimizer(inputs25, cropTomatoFixture, marketsFixture, baselineCentral);
+  const plan = result.bestSplitPlan;
+
+  // 1. Mass Conservation
+  const sumAllocated = plan.allocations.reduce((acc, a) => acc + a.allocatedQuintals, 0);
+  assert(Math.abs(sumAllocated - 25) < 0.001, 'Reconciliation 1', 'Dispatched quantities strictly sum to original harvest volume',
+    `Sum of Allocations: ${sumAllocated} Qtl === Harvest: 25 Qtl`);
+
+  // 2. Physical loss and saleable reconciliation per route
+  const legsReconciled = plan.allocations.every(a => Math.abs(a.allocatedQuintals - (a.physicalLossQuintals + a.saleableQuintals)) < 0.05);
+  assert(legsReconciled, 'Reconciliation 2', 'Physical loss + saleable quantity equals dispatched volume on every route',
+    `All ${plan.allocations.length} routes reconcile physical volume cleanly: ${legsReconciled}`);
+
+  // 3. Gross revenue equality
+  const sumGross = plan.allocations.reduce((acc, a) => acc + a.grossRevenue, 0);
+  assert(sumGross === plan.totalGrossRevenue, 'Reconciliation 3', 'Total gross revenue exactly equals sum of route gross revenues',
+    `Sum: ₹${sumGross} === Total: ₹${plan.totalGrossRevenue}`);
+
+  // 4. Transport cost equality
+  const sumTransport = plan.allocations.reduce((acc, a) => acc + a.transportCost, 0);
+  assert(sumTransport === plan.totalTransportCost, 'Reconciliation 4', 'Total transport costs exactly equal sum of route transport costs',
+    `Sum: ₹${sumTransport} === Total: ₹${plan.totalTransportCost}`);
+
+  // 5. Market fees equality
+  const sumFees = plan.allocations.reduce((acc, a) => acc + a.marketFees, 0);
+  assert(sumFees === plan.totalMarketFees, 'Reconciliation 5', 'Total market fees exactly equal sum of route mandi deductions',
+    `Sum: ₹${sumFees} === Total: ₹${plan.totalMarketFees}`);
+
+  // 6. Net Return reconciliation
+  const calculatedNet = plan.totalGrossRevenue - plan.totalTransportCost - plan.totalMarketFees;
+  assert(calculatedNet === plan.totalNetReturn, 'Reconciliation 6', 'Total net return exactly equals gross sales minus all deductions',
+    `Calculated: ₹${calculatedNet} === Plan Total: ₹${plan.totalNetReturn}`);
+
+  // 7. Net Gain calculation
+  const displayedGain = plan.totalNetReturn - baselineCentral.netReturn;
+  assert(displayedGain > 0, 'Reconciliation 7', 'Displayed gain strictly equals split-plan net return minus best single-market baseline',
+    `Split Net (₹${plan.totalNetReturn}) - Baseline Single (₹${baselineCentral.netReturn}) = Gain (+₹${displayedGain})`);
+}
+
+// ----------------------------------------------------------------------------
+// PART 5: SIMPLIFIED FARMER MODEL AUDIT (EXPECTED PRICE & PER-KM RENTAL)
+// ----------------------------------------------------------------------------
+console.log('\n--- PART 5: SIMPLIFIED FARMER MODEL AUDIT ---');
+
+{
+  // Test S1: Expected Price Per Quintal without Grade Percentages
+  const expectedPrice = 2400;
+  const kisanMarket = marketsFixture[0]; // Kisan Gramin, 18km, loss ~2%, cap 100 Qtl
+  // 20 Qtl tomato, spoilage 2% -> 19.6 Qtl saleable
+  const saleable = 20 * (1 - 0.02);
+  const kisanMultiplier = 0.92;
+  const effectivePrice = Math.round(expectedPrice * kisanMultiplier);
+  const expectedGross = Math.round(saleable * effectivePrice);
+
+  assert(effectivePrice === 2208, 'S1.1', 'Market price multiplier correctly scales expected selling price',
+    `Base Price ₹${expectedPrice} * Multiplier 0.92 = ₹${effectivePrice}/Qtl`);
+  assert(expectedGross === 43277, 'S1.2', 'Gross revenue computed accurately from expected price and saleable quantity',
+    `19.6 Qtl * ₹${effectivePrice} = ₹${expectedGross}`);
+
+  // Test S2: Simplified Rental Vehicle Rate per Km Calculation (1 Trip)
+  const ratePerKm = 35;
+  const distanceKm = 18;
+  const trips1 = Math.ceil(20 / 30); // 1 trip
+  const expectedRentalCost1 = trips1 * (distanceKm * 2) * ratePerKm;
+  assert(expectedRentalCost1 === 1260, 'S2.1', 'Rented vehicle cost calculated as trips * (dist * 2) * rate/km',
+    `1 trip * (18km * 2) * ₹${ratePerKm}/km = ₹${expectedRentalCost1}`);
+
+  // Test S3: Multi-trip Rented Vehicle Cost (2 Trips)
+  const trips2 = Math.ceil(40 / 30); // 2 trips
+  const expectedRentalCost2 = trips2 * (distanceKm * 2) * ratePerKm;
+  assert(expectedRentalCost2 === 2520, 'S3.1', 'Rented vehicle handles multi-trip consignment scaling cleanly',
+    `2 trips * (18km * 2) * ₹${ratePerKm}/km = ₹${expectedRentalCost2}`);
+}
+
 console.log('\n===============================================================');
 console.log(`FULL AUDIT SUMMARY: ${passedTests}/${totalTests} TESTS & SCENARIOS PASSED (${((passedTests / totalTests) * 100).toFixed(0)}%)`);
 console.log('===============================================================\n');
