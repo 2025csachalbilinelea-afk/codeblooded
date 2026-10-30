@@ -4,10 +4,22 @@ import { FarmerInputs } from '../types/agriculture';
 import { calculateMarketNetReturn } from './netReturn';
 import { rankMarketsByNetReturn } from './ranking';
 import { analyzeHighestPriceVsNetReturn } from './recommendations';
+import { calculateTransportationCost } from './transport';
+import { calculateSpoilagePercentage } from './spoilage';
 import { validateFarmerInputs } from '../utils/validation';
 
-export function runEngineVerification() {
-  const results: { test: string; passed: boolean; details: string }[] = [];
+export interface VerificationTestResult {
+  test: string;
+  passed: boolean;
+  details: string;
+}
+
+/**
+ * Executes the complete 12-scenario Phase 2 verification suite.
+ * All tests call the production TypeScript calculation engine directly.
+ */
+export function runEngineVerification(): VerificationTestResult[] {
+  const results: VerificationTestResult[] = [];
 
   const defaultInputs: FarmerInputs = {
     cropId: 'tomato',
@@ -45,172 +57,341 @@ export function runEngineVerification() {
     },
   };
 
-  const tomatoCrop = getCropById('tomato');
-  const markets = getSimulatedMarketsForCrop(tomatoCrop);
+  const tomato = getCropById('tomato');
+  const markets = getSimulatedMarketsForCrop(tomato);
 
-  // Test 1: Nearby market vs distant market transport cost impact
-  const nearbyMarket = markets.find((m) => m.distanceKm <= 25)!;
-  const distantMarket = markets.find((m) => m.distanceKm >= 140)!;
-  const resNearby = calculateMarketNetReturn(defaultInputs, tomatoCrop, nearbyMarket);
-  const resDistant = calculateMarketNetReturn(defaultInputs, tomatoCrop, distantMarket);
-  results.push({
-    test: '1. Transport cost scales with distance',
-    passed: resDistant.transportationCost > resNearby.transportationCost,
-    details: `Nearby (${nearbyMarket.distanceKm}km): ₹${resNearby.transportationCost} vs Distant (${distantMarket.distanceKm}km): ₹${resDistant.transportationCost}`,
-  });
+  // Scenario 1: A feasible market with the highest net return
+  {
+    const ranking = rankMarketsByNetReturn(defaultInputs, tomato, markets);
+    const best = ranking.bestMarket;
+    const isTopWinner =
+      best !== null &&
+      best.isFeasible &&
+      ranking.feasibleMarkets.every((m) => best.netReturn >= m.netReturn);
 
-  // Test 2: Distant market wins when its higher price justifies extra cost
-  const highPriceInputs: FarmerInputs = {
-    ...defaultInputs,
-    gradeDistribution: { A: 100, B: 0, C: 0 },
-    spoilage: { ...defaultInputs.spoilage, vehicleProtection: 'refrigerated', temperature: 'mild' },
-  };
-  const resDistantHigh = calculateMarketNetReturn(highPriceInputs, tomatoCrop, distantMarket);
-  const resNearbyHigh = calculateMarketNetReturn(highPriceInputs, tomatoCrop, nearbyMarket);
-  results.push({
-    test: '2. Distant market wins when high price premium justifies extra transport',
-    passed: resDistantHigh.grossRevenue > resNearbyHigh.grossRevenue,
-    details: `Distant Gross: ₹${resDistantHigh.grossRevenue} vs Nearby Gross: ₹${resNearbyHigh.grossRevenue}`,
-  });
+    results.push({
+      test: '1. Feasible market with highest net return identified',
+      passed: isTopWinner,
+      details: best
+        ? `Top Pick: ${best.market.name} with Net Return ₹${best.netReturn.toLocaleString('en-IN')} (Feasible: ${best.isFeasible})`
+        : 'No feasible market found',
+    });
+  }
 
-  // Test 3: Insufficient capacity excluded from single-market recommendations
-  const largeHarvestInputs: FarmerInputs = { ...defaultInputs, quantity: 25 };
-  const rankingLarge = rankMarketsByNetReturn(largeHarvestInputs, tomatoCrop, markets);
-  const sahyadriResult = rankingLarge.allResults.find((r) => r.market.id === 'sahyadri-boutique')!;
-  results.push({
-    test: '3. Market with capacity 12 Qtl marked infeasible for 25 Qtl harvest',
-    passed:
-      !sahyadriResult.isFeasible &&
-      rankingLarge.feasibleMarkets.every((m) => m.market.id !== 'sahyadri-boutique'),
-    details: `Sahyadri feasible: ${sahyadriResult.isFeasible}, Reason: ${sahyadriResult.feasibilityReasons[0]}`,
-  });
+  // Scenario 2: High-advertised-price market that fails capacity constraints
+  {
+    const inputs25: FarmerInputs = { ...defaultInputs, quantity: 25 };
+    const ranking25 = rankMarketsByNetReturn(inputs25, tomato, markets);
+    const sahyadri = ranking25.allResults.find((r) => r.market.id === 'sahyadri-boutique')!;
+    const sahyadriCapacity = sahyadri.market.maxCapacityQuintals; // 12 Qtl
+    const isExcluded =
+      !sahyadri.isFeasible &&
+      ranking25.feasibleMarkets.every((m) => m.market.id !== 'sahyadri-boutique') &&
+      ranking25.bestMarket?.market.id !== 'sahyadri-boutique';
 
-  // Test 4: Changing from Own to Rented transport updates costs
-  const rentedInputs: FarmerInputs = {
-    ...defaultInputs,
-    transport: { ...defaultInputs.transport, type: 'rented' },
-  };
-  const resOwn = calculateMarketNetReturn(defaultInputs, tomatoCrop, nearbyMarket);
-  const resRented = calculateMarketNetReturn(rentedInputs, tomatoCrop, nearbyMarket);
-  results.push({
-    test: '4. Transport type toggle updates transportation cost correctly',
-    passed: resOwn.transportationCost !== resRented.transportationCost,
-    details: `Own: ₹${resOwn.transportationCost} vs Rented: ₹${resRented.transportationCost}`,
-  });
+    results.push({
+      test: '2. High-advertised-price market failing capacity constraints marked infeasible',
+      passed: isExcluded,
+      details: `Sahyadri (Max ${sahyadriCapacity} Qtl vs Harvest 25 Qtl) -> Feasible: ${sahyadri.isFeasible}. Reason: "${sahyadri.feasibilityReasons[0]}"`,
+    });
+  }
 
-  // Test 5: Manual spoilage input directly sets physical loss
-  const manualInputs: FarmerInputs = {
-    ...defaultInputs,
-    spoilage: { ...defaultInputs.spoilage, mode: 'manual', manualPercentage: 8 },
-  };
-  const resManual = calculateMarketNetReturn(manualInputs, tomatoCrop, nearbyMarket);
-  results.push({
-    test: '5. Manual spoilage mode respects entered percentage',
-    passed: resManual.estimatedLossPercent === 8 && resManual.physicalLossQuintals === 1.6,
-    details: `Manual loss: ${resManual.estimatedLossPercent}%, Loss Qtl: ${resManual.physicalLossQuintals} Qtl`,
-  });
+  // Scenario 3: Market that fails its minimum consignment requirement
+  {
+    const smallInputs: FarmerInputs = { ...defaultInputs, quantity: 10 };
+    const rankingSmall = rankMarketsByNetReturn(smallInputs, tomato, markets);
+    const national = rankingSmall.allResults.find((r) => r.market.id === 'national-logistics')!;
+    const minConsignment = national.market.minPurchaseQuintals || 25;
+    const isExcluded = !national.isFeasible && national.feasibilityReasons.some((r) => r.includes('minimum consignment'));
 
-  // Test 6: Spoilage loss in automatic mode: Class 1 (Spinach) vs Class 4 (Wheat)
-  const spinach = getCropById('spinach');
-  const wheat = getCropById('wheat');
-  const spinachMarkets = getSimulatedMarketsForCrop(spinach);
-  const wheatMarkets = getSimulatedMarketsForCrop(wheat);
-  const resSpinach = calculateMarketNetReturn(
-    defaultInputs,
-    spinach,
-    spinachMarkets.find((m) => m.id === distantMarket.id)!
-  );
-  const resWheat = calculateMarketNetReturn(
-    defaultInputs,
-    wheat,
-    wheatMarkets.find((m) => m.id === distantMarket.id)!
-  );
-  results.push({
-    test: '6. Perishability Class 1 has significantly higher loss than Class 4',
-    passed: resSpinach.estimatedLossPercent > resWheat.estimatedLossPercent * 5,
-    details: `Spinach (Class 1) loss: ${resSpinach.estimatedLossPercent}% vs Wheat (Class 4) loss: ${resWheat.estimatedLossPercent}%`,
-  });
+    results.push({
+      test: '3. Market failing minimum consignment requirement marked infeasible',
+      passed: isExcluded,
+      details: `National Multimodal (Min ${minConsignment} Qtl vs Harvest 10 Qtl) -> Feasible: ${national.isFeasible}. Reason: "${national.feasibilityReasons[0]}"`,
+    });
+  }
 
-  // Test 7: Grade-wise prices change total revenue correctly
-  const highGradeInputs: FarmerInputs = {
-    ...defaultInputs,
-    gradeDistribution: { A: 80, B: 15, C: 5 },
-  };
-  const lowGradeInputs: FarmerInputs = {
-    ...defaultInputs,
-    gradeDistribution: { A: 10, B: 30, C: 60 },
-  };
-  const resHighGrade = calculateMarketNetReturn(highGradeInputs, tomatoCrop, nearbyMarket);
-  const resLowGrade = calculateMarketNetReturn(lowGradeInputs, tomatoCrop, nearbyMarket);
-  results.push({
-    test: '7. Grade-wise prices reflect higher revenue for premium grade lot',
-    passed: resHighGrade.grossRevenue > resLowGrade.grossRevenue,
-    details: `Prime Grade A (80%): ₹${resHighGrade.grossRevenue} vs Low Grade A (10%): ₹${resLowGrade.grossRevenue}`,
-  });
+  // Scenario 4: Zero harvest quantity
+  {
+    const zeroInputs: FarmerInputs = { ...defaultInputs, quantity: 0 };
+    const nearbyMarket = markets.find((m) => m.distanceKm <= 25)!;
+    const resZero = calculateMarketNetReturn(zeroInputs, tomato, nearbyMarket);
+    const rankingZero = rankMarketsByNetReturn(zeroInputs, tomato, markets);
 
-  // Test 8: Negative net return handled correctly without NaN or clipping
-  const tinyInputs: FarmerInputs = {
-    ...defaultInputs,
-    quantity: 0.5, // 0.5 quintal with heavy multi-hundred rupee transport/fixed fees
-  };
-  const resTiny = calculateMarketNetReturn(tinyInputs, tomatoCrop, distantMarket);
-  results.push({
-    test: '8. Legitimate negative net return supported cleanly without clipping',
-    passed: resTiny.netReturn < 0 && !isNaN(resTiny.netReturn) && isFinite(resTiny.netReturn),
-    details: `Net Return: ₹${resTiny.netReturn} (Gross ₹${resTiny.grossRevenue} - Expenses ₹${resTiny.totalExpenses})`,
-  });
+    const isZeroClean =
+      resZero.saleableQuantityQuintals === 0 &&
+      resZero.physicalLossQuintals === 0 &&
+      resZero.grossRevenue === 0 &&
+      resZero.transportationCost === 0 &&
+      resZero.totalMarketFees === 0 &&
+      resZero.netReturn === 0 &&
+      !resZero.isFeasible &&
+      rankingZero.feasibleMarkets.length === 0 &&
+      rankingZero.bestMarket === null;
 
-  // Test 9: Grade percentage validation rejects non-100% sum
-  const badGradeInputs: FarmerInputs = {
-    ...defaultInputs,
-    gradeDistribution: { A: 40, B: 20, C: 10 }, // 70%
-  };
-  const valResult = validateFarmerInputs(badGradeInputs);
-  results.push({
-    test: '9. Grade percentages must total 100%',
-    passed: !valResult.isValid && !!valResult.errors.grades,
-    details: `Validation rejected 70% sum: ${valResult.errors.grades}`,
-  });
+    results.push({
+      test: '4. Zero harvest quantity handled cleanly (zero financials, infeasible single sale)',
+      passed: isZeroClean,
+      details: `Gross: ₹${resZero.grossRevenue}, Transport: ₹${resZero.transportationCost}, Fees: ₹${resZero.totalMarketFees}, Net: ₹${resZero.netReturn}, Feasible: ${resZero.isFeasible}`,
+    });
+  }
 
-  // Test 10: Minimum consignment constraint enforced
-  const smallHarvestInputs: FarmerInputs = { ...defaultInputs, quantity: 10 };
-  const nationalLogisticsResult = rankMarketsByNetReturn(
-    smallHarvestInputs,
-    tomatoCrop,
-    markets
-  ).allResults.find((r) => r.market.id === 'national-logistics')!;
-  results.push({
-    test: '10. Minimum consignment threshold enforced',
-    passed: !nationalLogisticsResult.isFeasible,
-    details: `National Logistics (Min 25 Qtl) with 10 Qtl harvest: Feasible = ${nationalLogisticsResult.isFeasible}`,
-  });
+  // Scenario 5: Invalid grade distribution
+  {
+    const badGradeInputs: FarmerInputs = {
+      ...defaultInputs,
+      gradeDistribution: { A: 40, B: 20, C: 10 }, // 70% sum
+    };
+    const validation = validateFarmerInputs(badGradeInputs);
+    const nearbyMarket = markets.find((m) => m.distanceKm <= 25)!;
+    const resBad = calculateMarketNetReturn(badGradeInputs, tomato, nearbyMarket);
 
-  // Test 11: Vehicle carrying capacity validation
-  const invalidVehicleInputs: FarmerInputs = {
-    ...defaultInputs,
-    transport: {
-      ...defaultInputs.transport,
-      ownVehicle: { ...defaultInputs.transport.ownVehicle, capacityQuintals: 0 },
-    },
-  };
-  const valVehicle = validateFarmerInputs(invalidVehicleInputs);
-  results.push({
-    test: '11. Zero vehicle carrying capacity identified as logistics infeasibility',
-    passed: !valVehicle.isValid && !!valVehicle.errors.vehicleCapacity,
-    details: `Validation rejected 0 capacity: ${valVehicle.errors.vehicleCapacity}`,
-  });
+    const isRejected =
+      !validation.isValid &&
+      !!validation.errors.grades &&
+      !resBad.isFeasible &&
+      resBad.feasibilityReasons.some((r) => r.includes('Grade percentages must total exactly 100%'));
 
-  // Test 12: Highest price vs Highest Net Return dynamic analysis
-  const comparison = analyzeHighestPriceVsNetReturn(
-    rankingLarge.allResults,
-    rankingLarge.feasibleMarkets,
-    defaultInputs.gradeDistribution
-  );
-  results.push({
-    test: '12. Highest price vs Net Return dynamic explanation generated',
-    passed: !!comparison && comparison.dynamicExplanation.length > 50,
-    details: `Explanation snippet: ${comparison?.dynamicExplanation.slice(0, 80)}...`,
-  });
+    results.push({
+      test: '5. Invalid grade distribution rejected without silent concealment',
+      passed: isRejected,
+      details: `Validation: "${validation.errors.grades}", Engine Feasible: ${resBad.isFeasible}, Reason: "${resBad.feasibilityReasons[0]}"`,
+    });
+  }
+
+  // Scenario 6: Manual spoilage mode
+  {
+    const manualInputs: FarmerInputs = {
+      ...defaultInputs,
+      quantity: 20,
+      spoilage: {
+        mode: 'manual',
+        manualPercentage: 8,
+        temperature: 'hot', // changing weather shouldn't affect manual
+        vehicleProtection: 'open',
+        handling: 'rough',
+        delayHours: 3,
+      },
+    };
+    const nearbyMarket = markets.find((m) => m.distanceKm <= 25)!;
+    const resManual = calculateMarketNetReturn(manualInputs, tomato, nearbyMarket);
+
+    const isManualExact =
+      resManual.estimatedLossPercent === 8 &&
+      resManual.physicalLossQuintals === 1.6 &&
+      resManual.saleableQuantityQuintals === 18.4;
+
+    results.push({
+      test: '6. Manual spoilage mode respects entered percentage without auto additions',
+      passed: isManualExact,
+      details: `Manual %: ${resManual.estimatedLossPercent}%, Physical Loss: ${resManual.physicalLossQuintals} Qtl, Net Saleable: ${resManual.saleableQuantityQuintals} Qtl`,
+    });
+  }
+
+  // Scenario 7: Automatic spoilage mode
+  {
+    const spinach = getCropById('spinach');
+    const wheat = getCropById('wheat');
+    const autoLowLoss = calculateSpoilagePercentage(
+      spinach,
+      { mode: 'automatic', manualPercentage: 0, temperature: 'mild', vehicleProtection: 'refrigerated', handling: 'gentle', delayHours: 0 },
+      2,
+      1,
+      'optimal'
+    );
+    const autoHighLoss = calculateSpoilagePercentage(
+      spinach,
+      { mode: 'automatic', manualPercentage: 0, temperature: 'hot', vehicleProtection: 'open', handling: 'rough', delayHours: 2 },
+      4,
+      3,
+      'ripe'
+    );
+    const autoWheatLoss = calculateSpoilagePercentage(
+      wheat,
+      { mode: 'automatic', manualPercentage: 0, temperature: 'hot', vehicleProtection: 'open', handling: 'rough', delayHours: 2 },
+      4,
+      3,
+      'dry_stored'
+    );
+
+    const isAutoValid =
+      autoHighLoss.lossPercentage > autoLowLoss.lossPercentage * 2 &&
+      autoHighLoss.lossPercentage > autoWheatLoss.lossPercentage * 5;
+
+    results.push({
+      test: '7. Automatic spoilage responds dynamically to perishability class and environment',
+      passed: isAutoValid,
+      details: `Spinach Mild/Chilled: ${autoLowLoss.lossPercentage}% vs Hot/Open/Rough: ${autoHighLoss.lossPercentage}%. Wheat Dry: ${autoWheatLoss.lossPercentage}%`,
+    });
+  }
+
+  // Scenario 8: Own-vehicle round-trip cost
+  {
+    const distanceKm = 50;
+    const quantityQtl = 20;
+    const ownRoundTrip = calculateTransportationCost(
+      {
+        type: 'own',
+        ownVehicle: {
+          capacityQuintals: 25,
+          mileageKmPerLitre: 10,
+          fuelPricePerLitre: 100,
+          maintenancePerKm: 2,
+          driverCostPerTrip: 500,
+          tollAndOtherExpenses: 200,
+          returnTripRequired: true,
+        },
+        rentedVehicle: defaultInputs.transport.rentedVehicle,
+      },
+      distanceKm,
+      quantityQtl
+    );
+
+    const ownOneWay = calculateTransportationCost(
+      {
+        type: 'own',
+        ownVehicle: {
+          capacityQuintals: 25,
+          mileageKmPerLitre: 10,
+          fuelPricePerLitre: 100,
+          maintenancePerKm: 2,
+          driverCostPerTrip: 500,
+          tollAndOtherExpenses: 200,
+          returnTripRequired: false,
+        },
+        rentedVehicle: defaultInputs.transport.rentedVehicle,
+      },
+      distanceKm,
+      quantityQtl
+    );
+
+    // Distance per trip should be 100 km (round trip) vs 50 km (one way)
+    const isRoundTripExact =
+      ownRoundTrip.totalDistanceKm === 100 &&
+      ownOneWay.totalDistanceKm === 50 &&
+      ownRoundTrip.fuelCost === 1000 &&
+      ownOneWay.fuelCost === 500 &&
+      ownRoundTrip.maintenanceCost === 200 &&
+      ownOneWay.maintenanceCost === 100;
+
+    results.push({
+      test: '8. Own-vehicle round-trip distance and fuel cost calculated consistently',
+      passed: isRoundTripExact,
+      details: `Round-Trip: ${ownRoundTrip.totalDistanceKm} km, Fuel: ₹${ownRoundTrip.fuelCost} vs One-Way: ${ownOneWay.totalDistanceKm} km, Fuel: ₹${ownOneWay.fuelCost}`,
+    });
+  }
+
+  // Scenario 9: Rented transport without duplicate charges
+  {
+    const rentedCalc = calculateTransportationCost(
+      {
+        type: 'rented',
+        ownVehicle: defaultInputs.transport.ownVehicle,
+        rentedVehicle: {
+          capacityQuintals: 25,
+          rentalQuotationPerTrip: 3000,
+          additionalChargesPerTrip: 500,
+          rentalModel: 'flat',
+        },
+      },
+      75,
+      20
+    );
+
+    const isNoDuplicate =
+      rentedCalc.fuelCost === 0 &&
+      rentedCalc.driverCost === 0 &&
+      rentedCalc.maintenanceCost === 0 &&
+      rentedCalc.rentalCharges === 3000 &&
+      rentedCalc.tollsAndOtherCost === 500 &&
+      rentedCalc.totalCost === 3500;
+
+    results.push({
+      test: '9. Rented transport omits separate fuel and driver costs (no double-counting)',
+      passed: isNoDuplicate,
+      details: `Rental Quote: ₹${rentedCalc.rentalCharges}, Additional: ₹${rentedCalc.tollsAndOtherCost}, Fuel: ₹${rentedCalc.fuelCost}, Driver: ₹${rentedCalc.driverCost}, Total: ₹${rentedCalc.totalCost}`,
+    });
+  }
+
+  // Scenario 10: Negative net return
+  {
+    const tinyConsignment: FarmerInputs = {
+      ...defaultInputs,
+      quantity: 0.5, // 0.5 quintal haul over 165 km
+    };
+    const distantMarket = markets.find((m) => m.distanceKm >= 140)!;
+    const resTiny = calculateMarketNetReturn(tinyConsignment, tomato, distantMarket);
+
+    const isNegativeValid =
+      resTiny.netReturn < 0 &&
+      !isNaN(resTiny.netReturn) &&
+      isFinite(resTiny.netReturn) &&
+      resTiny.netReturn === resTiny.grossRevenue - resTiny.totalExpenses;
+
+    results.push({
+      test: '10. Legitimate negative net return supported cleanly without clipping to zero',
+      passed: isNegativeValid,
+      details: `Gross: ₹${resTiny.grossRevenue} - Expenses: ₹${resTiny.totalExpenses} = Net Return: ₹${resTiny.netReturn} (₹${resTiny.netReturnPerQuintal}/Qtl)`,
+    });
+  }
+
+  // Scenario 11: A fuel-price change that affects transport economics
+  {
+    const lowFuelInputs: FarmerInputs = {
+      ...defaultInputs,
+      transport: {
+        ...defaultInputs.transport,
+        ownVehicle: { ...defaultInputs.transport.ownVehicle, fuelPricePerLitre: 80 },
+      },
+    };
+    const highFuelInputs: FarmerInputs = {
+      ...defaultInputs,
+      transport: {
+        ...defaultInputs.transport,
+        ownVehicle: { ...defaultInputs.transport.ownVehicle, fuelPricePerLitre: 140 },
+      },
+    };
+    const distantMarket = markets.find((m) => m.distanceKm >= 140)!;
+    const resLow = calculateMarketNetReturn(lowFuelInputs, tomato, distantMarket);
+    const resHigh = calculateMarketNetReturn(highFuelInputs, tomato, distantMarket);
+
+    const fuelImpact = resHigh.transportationCost - resLow.transportationCost;
+    const isFuelSensitive = fuelImpact > 1000 && resHigh.netReturn < resLow.netReturn;
+
+    results.push({
+      test: '11. Diesel fuel price changes update transit costs and profit margins',
+      passed: isFuelSensitive,
+      details: `Diesel @ ₹80/L: Transport ₹${resLow.transportationCost}, Net ₹${resLow.netReturn} vs @ ₹140/L: Transport ₹${resHigh.transportationCost}, Net ₹${resHigh.netReturn} (Δ ₹${fuelImpact})`,
+    });
+  }
+
+  // Scenario 12: No feasible market
+  {
+    const massiveInputs: FarmerInputs = {
+      ...defaultInputs,
+      quantity: 1000, // 1000 Quintals exceeds all candidate market capacities (highest is 650 Qtl)
+    };
+    const rankingMassive = rankMarketsByNetReturn(massiveInputs, tomato, markets);
+    const comparisonMassive = analyzeHighestPriceVsNetReturn(
+      rankingMassive.allResults,
+      rankingMassive.feasibleMarkets,
+      massiveInputs.gradeDistribution
+    );
+
+    const isNoFeasibleValid =
+      rankingMassive.feasibleMarkets.length === 0 &&
+      rankingMassive.bestMarket === null &&
+      comparisonMassive !== null &&
+      !comparisonMassive.hasFeasibleOption &&
+      comparisonMassive.highestNetReturnMarket === null &&
+      comparisonMassive.dynamicExplanation.includes('None of the candidate markets can purchase');
+
+    results.push({
+      test: '12. Infeasible consignments correctly result in no recommended destination',
+      passed: isNoFeasibleValid,
+      details: `Feasible Count: ${rankingMassive.feasibleMarkets.length}, Best Market: ${rankingMassive.bestMarket}, Explanation: "${comparisonMassive?.dynamicExplanation.slice(0, 95)}..."`,
+    });
+  }
 
   return results;
 }

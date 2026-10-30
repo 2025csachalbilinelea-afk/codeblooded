@@ -17,13 +17,21 @@ export interface TransportCostCalculation {
 /**
  * Calculates transportation cost and logistics feasibility for transporting a given harvest
  * to a market at a specified one-way distance.
+ *
+ * Rules:
+ * - Own vehicle: calculates fuel, maintenance, driver batta, and tolls.
+ *   Respects returnTripRequired (round-trip = 2 × one-way distance).
+ * - Rented vehicle: flat or distance-scaled quotation plus loading/permits.
+ *   Commercial quotation includes fuel and driver charges (no double-counting).
+ * - All non-positive capacity, non-positive mileage, and negative prices are caught as infeasible.
+ * - Non-positive harvest quantity is flagged as infeasible with zero costs.
  */
 export function calculateTransportationCost(
   config: TransportConfig,
   distanceKm: number,
   quantityQuintals: number
 ): TransportCostCalculation {
-  if (quantityQuintals <= 0) {
+  if (quantityQuintals <= 0 || isNaN(quantityQuintals) || !isFinite(quantityQuintals)) {
     return {
       totalCost: 0,
       tripsCount: 0,
@@ -34,13 +42,30 @@ export function calculateTransportationCost(
       tollsAndOtherCost: 0,
       rentalCharges: 0,
       costPerQuintal: 0,
-      isFeasible: true,
+      isFeasible: false,
+      feasibilityReason: 'Consignment quantity must be greater than zero.',
+    };
+  }
+
+  if (distanceKm < 0 || isNaN(distanceKm) || !isFinite(distanceKm)) {
+    return {
+      totalCost: 0,
+      tripsCount: 0,
+      totalDistanceKm: 0,
+      fuelCost: 0,
+      maintenanceCost: 0,
+      driverCost: 0,
+      tollsAndOtherCost: 0,
+      rentalCharges: 0,
+      costPerQuintal: 0,
+      isFeasible: false,
+      feasibilityReason: 'Transit distance cannot be negative or invalid.',
     };
   }
 
   if (config.type === 'own') {
     const own = config.ownVehicle;
-    if (own.capacityQuintals <= 0) {
+    if (isNaN(own.capacityQuintals) || own.capacityQuintals <= 0) {
       return {
         totalCost: 0,
         tripsCount: 0,
@@ -56,11 +81,43 @@ export function calculateTransportationCost(
       };
     }
 
+    if (isNaN(own.mileageKmPerLitre) || own.mileageKmPerLitre <= 0) {
+      return {
+        totalCost: 0,
+        tripsCount: 0,
+        totalDistanceKm: 0,
+        fuelCost: 0,
+        maintenanceCost: 0,
+        driverCost: 0,
+        tollsAndOtherCost: 0,
+        rentalCharges: 0,
+        costPerQuintal: 0,
+        isFeasible: false,
+        feasibilityReason: 'Vehicle mileage must be greater than zero.',
+      };
+    }
+
+    if (isNaN(own.fuelPricePerLitre) || own.fuelPricePerLitre < 0) {
+      return {
+        totalCost: 0,
+        tripsCount: 0,
+        totalDistanceKm: 0,
+        fuelCost: 0,
+        maintenanceCost: 0,
+        driverCost: 0,
+        tollsAndOtherCost: 0,
+        rentalCharges: 0,
+        costPerQuintal: 0,
+        isFeasible: false,
+        feasibilityReason: 'Fuel price cannot be negative.',
+      };
+    }
+
     const tripsCount = Math.max(1, Math.ceil(quantityQuintals / own.capacityQuintals));
     const distancePerTrip = own.returnTripRequired ? distanceKm * 2 : distanceKm;
     const totalDistanceKm = tripsCount * distancePerTrip;
 
-    // Feasibility check: Making excessive trips (>5 trips) to distant markets (>100 km)
+    // Feasibility check: Making excessive trips (>4 trips) to distant markets (>80 km)
     // is physically infeasible in a single day before harvest deteriorates
     let isFeasible = true;
     let feasibilityReason: string | undefined;
@@ -69,13 +126,11 @@ export function calculateTransportationCost(
       feasibilityReason = `Consignment requires ${tripsCount} round-trips over ${distanceKm} km (${totalDistanceKm} km total), which is physically infeasible for a single vehicle before produce spoils.`;
     }
 
-    const mileage = Math.max(0.1, own.mileageKmPerLitre);
-    const fuelLitres = totalDistanceKm / mileage;
-    const fuelCost = Math.round(fuelLitres * Math.max(0, own.fuelPricePerLitre));
-
-    const maintenanceCost = Math.round(totalDistanceKm * Math.max(0, own.maintenancePerKm));
-    const driverCost = Math.round(tripsCount * Math.max(0, own.driverCostPerTrip));
-    const tollsAndOtherCost = Math.round(tripsCount * Math.max(0, own.tollAndOtherExpenses));
+    const fuelLitres = totalDistanceKm / own.mileageKmPerLitre;
+    const fuelCost = Math.round(fuelLitres * own.fuelPricePerLitre);
+    const maintenanceCost = Math.round(totalDistanceKm * Math.max(0, own.maintenancePerKm || 0));
+    const driverCost = Math.round(tripsCount * Math.max(0, own.driverCostPerTrip || 0));
+    const tollsAndOtherCost = Math.round(tripsCount * Math.max(0, own.tollAndOtherExpenses || 0));
 
     const totalCost = fuelCost + maintenanceCost + driverCost + tollsAndOtherCost;
     const costPerQuintal = quantityQuintals > 0 ? Number((totalCost / quantityQuintals).toFixed(2)) : 0;
@@ -96,7 +151,7 @@ export function calculateTransportationCost(
   } else {
     // Rented vehicle
     const rented = config.rentedVehicle;
-    if (rented.capacityQuintals <= 0) {
+    if (isNaN(rented.capacityQuintals) || rented.capacityQuintals <= 0) {
       return {
         totalCost: 0,
         tripsCount: 0,
@@ -112,6 +167,22 @@ export function calculateTransportationCost(
       };
     }
 
+    if (isNaN(rented.rentalQuotationPerTrip) || rented.rentalQuotationPerTrip < 0) {
+      return {
+        totalCost: 0,
+        tripsCount: 0,
+        totalDistanceKm: 0,
+        fuelCost: 0,
+        maintenanceCost: 0,
+        driverCost: 0,
+        tollsAndOtherCost: 0,
+        rentalCharges: 0,
+        costPerQuintal: 0,
+        isFeasible: false,
+        feasibilityReason: 'Rental quotation cannot be negative.',
+      };
+    }
+
     const tripsCount = Math.max(1, Math.ceil(quantityQuintals / rented.capacityQuintals));
     const totalDistanceKm = tripsCount * distanceKm * 2;
 
@@ -122,9 +193,6 @@ export function calculateTransportationCost(
       feasibilityReason = `Consignment requires ${tripsCount} rental trips over ${distanceKm} km, which is practically infeasible for single-day delivery.`;
     }
 
-    // Rental calculation model:
-    // When distance_scaled (default), base quotation is calibrated for a standard 50km haul.
-    // Beyond that, commercial freight scales proportionally with destination distance.
     const rentalModel = rented.rentalModel || 'distance_scaled';
     let tripRental = rented.rentalQuotationPerTrip;
     if (rentalModel === 'distance_scaled') {
@@ -132,10 +200,10 @@ export function calculateTransportationCost(
       tripRental = Math.round(rented.rentalQuotationPerTrip * distanceRatio);
     }
 
-    const totalRental = Math.round(tripsCount * Math.max(0, tripRental));
-    const totalAdditional = Math.round(tripsCount * Math.max(0, rented.additionalChargesPerTrip));
+    const totalRental = Math.round(tripsCount * tripRental);
+    const totalAdditional = Math.round(tripsCount * Math.max(0, rented.additionalChargesPerTrip || 0));
 
-    // Note: In rented mode, fuel and driver are included in the quotation as per requirements
+    // In rented mode: fuel, maintenance, driver are included in quotation (no double-counting)
     const totalCost = totalRental + totalAdditional;
     const costPerQuintal = quantityQuintals > 0 ? Number((totalCost / quantityQuintals).toFixed(2)) : 0;
 

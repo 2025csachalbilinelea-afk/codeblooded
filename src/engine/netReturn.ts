@@ -9,20 +9,22 @@ import { convertToQuintals } from './units';
 import { calculateSpoilagePercentage } from './spoilage';
 import { calculateTransportationCost } from './transport';
 import { calculateMarketFees } from './marketFees';
+import { GRADE_DISTRIBUTION_TOLERANCE } from '../utils/validation';
 
 /**
  * Calculates the complete financial and logistics outcome for selling a farmer's harvest
  * at a specific market destination.
+ *
  * Implements full pipeline:
  * 1. Standardization to quintals
- * 2. Initial grade quantities
- * 3. Physical loss calculation
- * 4. Modeled quality downgrading (conserving total saleable mass)
+ * 2. Input validation & grade conservation
+ * 3. Physical loss calculation: Saleable quantity = harvest quantity − physical spoilage quantity
+ * 4. Modeled quality downgrading (strictly conserving total saleable mass)
  * 5. Grade-specific revenue
- * 6. Transportation cost & trips feasibility
- * 7. Regulated market fees & statutory deductions
- * 8. Net in-pocket return (supporting legitimate deficits)
- * 9. Feasibility constraints (purchase ceilings, minimum orders, logistics)
+ * 6. Transportation cost & trip feasibility (one-way vs round-trip)
+ * 7. Regulated market fees & statutory deductions (deducted exactly once)
+ * 8. Net in-pocket return = gross sales − transport cost − market fees (supporting legitimate deficits)
+ * 9. Feasibility constraints (purchase ceilings, minimum orders, vehicle constraints, active quotations)
  */
 export function calculateMarketNetReturn(
   inputs: FarmerInputs,
@@ -32,20 +34,41 @@ export function calculateMarketNetReturn(
   const totalQuintals = convertToQuintals(inputs.quantity, inputs.quantityUnit);
   const feasibilityReasons: string[] = [];
 
-  // Normalize grade distribution
-  const totalGradePct = (inputs.gradeDistribution.A || 0) + (inputs.gradeDistribution.B || 0) + (inputs.gradeDistribution.C || 0);
-  const factor = totalGradePct > 0 ? 100 / totalGradePct : 1;
-  const normA = (inputs.gradeDistribution.A || 0) * factor;
-  const normB = (inputs.gradeDistribution.B || 0) * factor;
-  const normC = (inputs.gradeDistribution.C || 0) * factor;
+  // Zero or negative harvest volume check
+  if (totalQuintals <= 0) {
+    feasibilityReasons.push('Harvest quantity must be greater than zero.');
+  }
+
+  // Grade distribution validation
+  const rawA = inputs.gradeDistribution?.A ?? 0;
+  const rawB = inputs.gradeDistribution?.B ?? 0;
+  const rawC = inputs.gradeDistribution?.C ?? 0;
+  const hasNegativeGrade = rawA < 0 || rawB < 0 || rawC < 0 || isNaN(rawA) || isNaN(rawB) || isNaN(rawC);
+  const totalGradePct = rawA + rawB + rawC;
+  const isGradeDistributionValid = !hasNegativeGrade && Math.abs(totalGradePct - 100) <= GRADE_DISTRIBUTION_TOLERANCE;
+
+  if (!isGradeDistributionValid) {
+    feasibilityReasons.push(
+      `Grade percentages must total exactly 100% (currently ${totalGradePct}%).`
+    );
+  }
+
+  // Use normalized factors only when within acceptable tolerance (to absorb floating-point imprecision)
+  const factor = isGradeDistributionValid && totalGradePct > 0 ? 100 / totalGradePct : 1;
+  const normA = (rawA || 0) * factor;
+  const normB = (rawB || 0) * factor;
+
+  const initialGradeA = Number(((totalQuintals * normA) / 100).toFixed(2));
+  const initialGradeB = Number(((totalQuintals * normB) / 100).toFixed(2));
+  const initialGradeC = Number(Math.max(0, totalQuintals - initialGradeA - initialGradeB).toFixed(2));
 
   const initialGradeQuantities: Record<Grade, number> = {
-    A: Number(((totalQuintals * normA) / 100).toFixed(2)),
-    B: Number(((totalQuintals * normB) / 100).toFixed(2)),
-    C: Number(((totalQuintals * normC) / 100).toFixed(2)),
+    A: initialGradeA,
+    B: initialGradeB,
+    C: initialGradeC,
   };
 
-  // 1. Spoilage & Physical Loss (Separated from quality downgrading)
+  // 1. Spoilage & Physical Loss: Saleable quantity = harvest quantity − physical spoilage quantity
   const spoilageBreakdown = calculateSpoilagePercentage(
     crop,
     inputs.spoilage,
@@ -55,41 +78,55 @@ export function calculateMarketNetReturn(
   );
 
   const lossFraction = spoilageBreakdown.lossPercentage / 100;
-  const physicalLossQuintals = Number((totalQuintals * lossFraction).toFixed(2));
-  const saleableQuantityQuintals = Math.max(0, Number((totalQuintals - physicalLossQuintals).toFixed(2)));
+  const physicalLossQuintals = Number(Math.min(totalQuintals, totalQuintals * lossFraction).toFixed(2));
+  const saleableQuantityQuintals = Math.max(
+    0,
+    Math.min(totalQuintals, Number((totalQuintals - physicalLossQuintals).toFixed(2)))
+  );
 
   // Pre-downgrade saleable quantities
+  const preSaleA = Number((initialGradeQuantities.A * (1 - lossFraction)).toFixed(2));
+  const preSaleB = Number((initialGradeQuantities.B * (1 - lossFraction)).toFixed(2));
+  const preSaleC = Math.max(0, Number((saleableQuantityQuintals - preSaleA - preSaleB).toFixed(2)));
+
   const preGradeSaleable: Record<Grade, number> = {
-    A: Number((initialGradeQuantities.A * (1 - lossFraction)).toFixed(2)),
-    B: Number((initialGradeQuantities.B * (1 - lossFraction)).toFixed(2)),
-    C: Number((initialGradeQuantities.C * (1 - lossFraction)).toFixed(2)),
+    A: preSaleA,
+    B: preSaleB,
+    C: preSaleC,
   };
 
-  // 2. Modeled Quality Downgrading (Transferring between grades without double-counting)
-  // Perishable produce (Classes 1 & 2) in hot or rough transit experiences surface bruising / softness
+  // 2. Modeled Quality Downgrading (Transferring between grades while strictly conserving saleable mass)
   let downgradeRate = 0;
   if (crop.perishabilityClass <= 2) {
     const roughFactor =
       inputs.spoilage.handling === 'rough' ? 1.5 : inputs.spoilage.handling === 'standard' ? 1.0 : 0.5;
-    const transitFactor = Math.min(2.0, market.estimatedTravelTimeHours / 4.0);
+    const transitFactor = Math.min(2.0, Math.max(0, market.estimatedTravelTimeHours || 0) / 4.0);
     downgradeRate = Math.min(0.12, 0.02 * transitFactor * roughFactor);
   }
 
-  const downgradedQuintalsAtoB = Number((preGradeSaleable.A * downgradeRate).toFixed(2));
-  const downgradedQuintalsBtoC = Number((preGradeSaleable.B * downgradeRate).toFixed(2));
+  const downgradedQuintalsAtoB = Math.min(preGradeSaleable.A, Number((preGradeSaleable.A * downgradeRate).toFixed(2)));
+  const downgradedQuintalsBtoC = Math.min(preGradeSaleable.B, Number((preGradeSaleable.B * downgradeRate).toFixed(2)));
 
-  // Post-downgrade grade quantities (Mass is strictly conserved)
+  // Post-downgrade grade quantities: Mass is strictly conserved: A + B + C === saleableQuantityQuintals
+  const postSaleA = Number(Math.max(0, preGradeSaleable.A - downgradedQuintalsAtoB).toFixed(2));
+  const postSaleB = Number(Math.max(0, preGradeSaleable.B + downgradedQuintalsAtoB - downgradedQuintalsBtoC).toFixed(2));
+  const postSaleC = Number(Math.max(0, saleableQuantityQuintals - postSaleA - postSaleB).toFixed(2));
+
   const gradeSaleableQuantities: Record<Grade, number> = {
-    A: Number(Math.max(0, preGradeSaleable.A - downgradedQuintalsAtoB).toFixed(2)),
-    B: Number(Math.max(0, preGradeSaleable.B + downgradedQuintalsAtoB - downgradedQuintalsBtoC).toFixed(2)),
-    C: Number(Math.max(0, preGradeSaleable.C + downgradedQuintalsBtoC).toFixed(2)),
+    A: postSaleA,
+    B: postSaleB,
+    C: postSaleC,
   };
 
   // 3. Gross Revenue by Grade
+  const priceA = market.pricesPerQuintal?.A ?? 0;
+  const priceB = market.pricesPerQuintal?.B ?? 0;
+  const priceC = market.pricesPerQuintal?.C ?? 0;
+
   const gradeRevenue: Record<Grade, number> = {
-    A: Math.round(gradeSaleableQuantities.A * (market.pricesPerQuintal.A || 0)),
-    B: Math.round(gradeSaleableQuantities.B * (market.pricesPerQuintal.B || 0)),
-    C: Math.round(gradeSaleableQuantities.C * (market.pricesPerQuintal.C || 0)),
+    A: Math.round(gradeSaleableQuantities.A * priceA),
+    B: Math.round(gradeSaleableQuantities.B * priceB),
+    C: Math.round(gradeSaleableQuantities.C * priceC),
   };
 
   const grossRevenue = gradeRevenue.A + gradeRevenue.B + gradeRevenue.C;
@@ -110,13 +147,13 @@ export function calculateMarketNetReturn(
     transport.tripsCount
   );
 
-  // 6. Total Expenses & Net Return (Legitimate negative results preserved)
+  // 6. Total Expenses & Net Return (Costs deducted exactly once; supports legitimate deficits)
   const totalExpenses = transport.totalCost + fees.totalMarketFees;
   const netReturn = grossRevenue - totalExpenses;
   const netReturnPerQuintal = totalQuintals > 0 ? Math.round(netReturn / totalQuintals) : 0;
 
-  // 7. Mandatory Feasibility Validation (Purchase ceilings & minimum orders)
-  if (totalQuintals > market.maxCapacityQuintals) {
+  // 7. Mandatory Feasibility Validation (Purchase ceilings, minimum consignments, active quotes)
+  if (market.maxCapacityQuintals <= 0 || totalQuintals > market.maxCapacityQuintals) {
     feasibilityReasons.push(
       `Market capacity is only ${market.maxCapacityQuintals} Qtl, but your harvest is ${totalQuintals.toFixed(1)} Qtl. It is not feasible for a single-market sale.`
     );
@@ -128,15 +165,21 @@ export function calculateMarketNetReturn(
     );
   }
 
-  if (!market.pricesPerQuintal.A || market.pricesPerQuintal.A <= 0) {
+  const hasValidQuote =
+    market.pricesPerQuintal &&
+    market.pricesPerQuintal.A > 0 &&
+    (normB <= 0 || (market.pricesPerQuintal.B && market.pricesPerQuintal.B > 0)) &&
+    (normA + normB >= 100 || (market.pricesPerQuintal.C && market.pricesPerQuintal.C > 0));
+
+  if (!hasValidQuote) {
     feasibilityReasons.push('No active quotation available for this crop at this market.');
   }
 
   const isFeasible = feasibilityReasons.length === 0;
   const capacityUtilizationPercent =
-    market.maxCapacityQuintals > 0
+    totalQuintals > 0 && market.maxCapacityQuintals > 0
       ? Math.min(100, Math.round((totalQuintals / market.maxCapacityQuintals) * 100))
-      : 100;
+      : 0;
 
   return {
     market,

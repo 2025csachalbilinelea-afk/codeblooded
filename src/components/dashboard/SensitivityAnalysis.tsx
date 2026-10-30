@@ -119,6 +119,9 @@ export const SensitivityAnalysis: React.FC<SensitivityAnalysisProps> = ({
                       )} / Qtl
                     </strong>{' '}
                     for Grade A produce.
+                    <p className="mt-1 text-[10px] text-stone-400 italic">
+                      * Estimated break-even price threshold for planning; not a guaranteed or confirmed market quote.
+                    </p>
                   </div>
                 </div>
               ) : (

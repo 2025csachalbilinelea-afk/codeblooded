@@ -9,13 +9,14 @@ function getEffectiveAdvertisedPrice(
   result: MarketCalculationResult,
   grades?: GradeDistribution
 ): number {
-  if (!grades) return result.market.pricesPerQuintal.A;
+  if (!result.market.pricesPerQuintal) return 0;
+  if (!grades) return result.market.pricesPerQuintal.A || 0;
   const sum = (grades.A || 0) + (grades.B || 0) + (grades.C || 0);
-  if (sum === 0) return result.market.pricesPerQuintal.A;
+  if (sum === 0) return result.market.pricesPerQuintal.A || 0;
   return Math.round(
-    ((grades.A || 0) * result.market.pricesPerQuintal.A +
-      (grades.B || 0) * result.market.pricesPerQuintal.B +
-      (grades.C || 0) * result.market.pricesPerQuintal.C) /
+    (((grades.A || 0) * (result.market.pricesPerQuintal.A || 0)) +
+      ((grades.B || 0) * (result.market.pricesPerQuintal.B || 0)) +
+      ((grades.C || 0) * (result.market.pricesPerQuintal.C || 0))) /
       sum
   );
 }
@@ -32,7 +33,7 @@ export function analyzeHighestPriceVsNetReturn(
 ): ComparisonAnalysis | null {
   if (allResults.length === 0) return null;
 
-  // 1. Highest advertised price across all markets (regardless of capacity)
+  // 1. Highest advertised price across all candidate markets
   const highestPriceMarket = [...allResults].sort((a, b) => {
     const priceA = getEffectiveAdvertisedPrice(b, grades);
     const priceB = getEffectiveAdvertisedPrice(a, grades);
@@ -49,7 +50,7 @@ export function analyzeHighestPriceVsNetReturn(
         })[0]
       : null;
 
-  // 3. Highest net return market (ONLY from feasible destinations)
+  // 3. Highest net return market (strictly selected ONLY from feasible destinations)
   const hasFeasibleOption = feasibleMarkets.length > 0;
   const highestNetReturnMarket = hasFeasibleOption ? feasibleMarkets[0] : null;
 
@@ -82,7 +83,7 @@ export function analyzeHighestPriceVsNetReturn(
 
   // Scenario B: Highest price market is the SAME as the highest net return market
   if (isSameMarket) {
-    dynamicExplanation = `Remarkably, ${highestPriceMarket.market.name} offers both the highest advertised produce price (₹${hpPrice.toLocaleString('en-IN')}/Qtl) and yields the highest estimated net return (₹${highestNetReturnMarket.netReturn.toLocaleString('en-IN')}). Its price premium comfortably outweighs transportation expenses and mandi charges.`;
+    dynamicExplanation = `Remarkably, ${highestPriceMarket.market.name} offers both the highest advertised produce rate (₹${hpPrice.toLocaleString('en-IN')}/Qtl) and yields the highest estimated net return (₹${highestNetReturnMarket.netReturn.toLocaleString('en-IN')}). Its price premium comfortably outweighs transportation expenses and mandi charges.`;
   }
   // Scenario C: Highest price market is INFEASIBLE (e.g. exceeds quota or fails minimum consignment)
   else if (!highestPriceMarket.isFeasible) {
@@ -91,10 +92,6 @@ export function analyzeHighestPriceVsNetReturn(
   }
   // Scenario D: Both are feasible, but the lower-price market yields higher net in-pocket return!
   else {
-    const extraTransport =
-      highestPriceMarket.transportationCost - highestNetReturnMarket.transportationCost;
-    const extraFees = highestPriceMarket.totalMarketFees - highestNetReturnMarket.totalMarketFees;
-
     dynamicExplanation = `${highestPriceMarket.market.name} advertises a higher rate of ₹${hpPrice.toLocaleString('en-IN')}/Qtl (versus ₹${hnrPrice.toLocaleString('en-IN')}/Qtl at ${highestNetReturnMarket.market.name}). However, after deducting ₹${highestPriceMarket.transportationCost.toLocaleString('en-IN')} in transport expenses (${highestPriceMarket.market.distanceKm} km haul), ₹${highestPriceMarket.totalMarketFees.toLocaleString('en-IN')} in mandi deductions, and ${highestPriceMarket.estimatedLossPercent}% transit spoilage, ${highestNetReturnMarket.market.name} actually deposits ₹${Math.abs(netReturnDifferenceTotal).toLocaleString('en-IN')} MORE into your pocket (₹${highestNetReturnMarket.netReturn.toLocaleString('en-IN')} vs. ₹${highestPriceMarket.netReturn.toLocaleString('en-IN')}).`;
   }
 
@@ -112,13 +109,15 @@ export function analyzeHighestPriceVsNetReturn(
 }
 
 /**
- * Calculates how much a competing market would need to increase its prices
+ * Calculates how much a competing feasible market would need to increase its prices
  * to match or surpass the recommended best market.
+ * Clearly distinguishes an estimated break-even threshold from a guaranteed market price.
  */
 export function calculateBreakEven(
   bestMarket: MarketCalculationResult,
   competitor: MarketCalculationResult
 ): BreakEvenAnalysis | null {
+  if (!bestMarket.isFeasible || !competitor.isFeasible) return null;
   if (bestMarket.market.id === competitor.market.id) return null;
   if (competitor.saleableQuantityQuintals <= 0) return null;
 
@@ -127,17 +126,17 @@ export function calculateBreakEven(
 
   // Additional revenue needed at competitor market
   const feeRate =
-    (competitor.market.commissionFeePercent + competitor.market.marketCessPercent) / 100;
+    ((competitor.market.commissionFeePercent || 0) + (competitor.market.marketCessPercent || 0)) / 100;
   const effectiveRetainedRatio = Math.max(0.5, 1 - feeRate);
 
   const requiredPriceIncreasePerQuintal = Math.round(
     currentNetReturnGap / (competitor.saleableQuantityQuintals * effectiveRetainedRatio)
   );
 
-  const basePrice = competitor.averagePricePerQuintalSold || competitor.market.pricesPerQuintal.A;
-  const requiredPricePercentageIncrease = Number(
-    ((requiredPriceIncreasePerQuintal / basePrice) * 100).toFixed(1)
-  );
+  const basePrice = competitor.averagePricePerQuintalSold || competitor.market.pricesPerQuintal?.A || 0;
+  const requiredPricePercentageIncrease = basePrice > 0
+    ? Number(((requiredPriceIncreasePerQuintal / basePrice) * 100).toFixed(1))
+    : 0;
 
   return {
     targetMarketName: competitor.market.name,
