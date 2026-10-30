@@ -6,6 +6,7 @@ import { rankMarketsByNetReturn } from './ranking';
 import { analyzeHighestPriceVsNetReturn } from './recommendations';
 import { calculateTransportationCost } from './transport';
 import { calculateSpoilagePercentage } from './spoilage';
+import { optimizeSplitHarvest } from './splitHarvest';
 import { validateFarmerInputs } from '../utils/validation';
 
 export interface VerificationTestResult {
@@ -15,7 +16,7 @@ export interface VerificationTestResult {
 }
 
 /**
- * Executes the complete 12-scenario Phase 2 verification suite.
+ * Executes the complete 17-scenario Phase 2 & 3 verification suite.
  * All tests call the production TypeScript calculation engine directly.
  */
 export function runEngineVerification(): VerificationTestResult[] {
@@ -390,6 +391,129 @@ export function runEngineVerification(): VerificationTestResult[] {
       test: '12. Infeasible consignments correctly result in no recommended destination',
       passed: isNoFeasibleValid,
       details: `Feasible Count: ${rankingMassive.feasibleMarkets.length}, Best Market: ${rankingMassive.bestMarket}, Explanation: "${comparisonMassive?.dynamicExplanation.slice(0, 95)}..."`,
+    });
+  }
+
+  // Scenario 13: Split-harvest calculation respects conservation of mass (sum of allocations = total harvest)
+  {
+    const inputs25: FarmerInputs = {
+      ...defaultInputs,
+      quantity: 25,
+      gradeDistribution: { A: 80, B: 15, C: 5 },
+    };
+    const ranking25 = rankMarketsByNetReturn(inputs25, tomato, markets);
+    const splitResult = optimizeSplitHarvest(inputs25, tomato, markets, ranking25.bestMarket);
+
+    const sumAllocated = splitResult.allocations.reduce((sum, a) => sum + a.allocatedQuintals, 0);
+    const isMassConserved =
+      splitResult.hasFeasibleSplit &&
+      Math.abs(sumAllocated - 25) < 0.001 &&
+      splitResult.planTotals.totalAllocatedQuintals === 25;
+
+    results.push({
+      test: '13. Split-harvest calculation respects conservation of mass (sum of allocations = total harvest)',
+      passed: isMassConserved,
+      details: `Harvest: 25 Qtl -> Allocations: ${splitResult.allocations.map((a) => `${a.market.name.split(' ')[0]}: ${a.allocatedQuintals} Qtl`).join(' + ')} (Sum: ${sumAllocated} Qtl)`,
+    });
+  }
+
+  // Scenario 14: Capacity limits enforced on every individual leg of a split harvest
+  {
+    const inputs25: FarmerInputs = {
+      ...defaultInputs,
+      quantity: 25,
+      gradeDistribution: { A: 80, B: 15, C: 5 },
+    };
+    const ranking25 = rankMarketsByNetReturn(inputs25, tomato, markets);
+    const splitResult = optimizeSplitHarvest(inputs25, tomato, markets, ranking25.bestMarket);
+
+    const allLegsWithinCapacity =
+      splitResult.hasFeasibleSplit &&
+      splitResult.allocations.length > 0 &&
+      splitResult.allocations.every(
+        (a) =>
+          a.allocatedQuintals <= a.market.maxCapacityQuintals &&
+          (!a.market.minPurchaseQuintals || a.allocatedQuintals >= a.market.minPurchaseQuintals)
+      );
+
+    const sahyadriLeg = splitResult.allocations.find((a) => a.market.id === 'sahyadri-boutique');
+    const respectsSahyadriCap = !sahyadriLeg || sahyadriLeg.allocatedQuintals <= 12;
+
+    results.push({
+      test: '14. Capacity limits enforced on every individual leg of a split harvest',
+      passed: allLegsWithinCapacity && respectsSahyadriCap,
+      details: `Sahyadri Allocation: ${sahyadriLeg ? `${sahyadriLeg.allocatedQuintals} Qtl (Cap: 12 Qtl)` : 'N/A'}. All legs within capacity: ${allLegsWithinCapacity}`,
+    });
+  }
+
+  // Scenario 15: Multi-trip transport costs calculated independently for each destination
+  {
+    const splitInputs25: FarmerInputs = {
+      ...defaultInputs,
+      quantity: 25,
+      gradeDistribution: { A: 80, B: 15, C: 5 },
+    };
+    const splitResult = optimizeSplitHarvest(splitInputs25, tomato, markets, null);
+
+    const sumLegCosts = splitResult.allocations.reduce((sum, a) => sum + a.transportCost, 0);
+    const isIndependentCosting =
+      splitResult.hasFeasibleSplit &&
+      splitResult.allocations.length >= 2 &&
+      splitResult.planTotals.totalTransportCost === sumLegCosts &&
+      splitResult.allocations.every((a) => a.transportTrips >= 1 && a.transportCost > 0);
+
+    results.push({
+      test: '15. Multi-trip transport costs calculated independently for each destination',
+      passed: isIndependentCosting,
+      details: `Independent Transport Costs: ${splitResult.allocations.map((a) => `${a.market.name.split(' ')[0]}: ₹${a.transportCost} (${a.transportTrips} trip)`).join(' + ')} = Total ₹${splitResult.planTotals.totalTransportCost}`,
+    });
+  }
+
+  // Scenario 16: Higher net return with split harvest
+  {
+    const inputs25: FarmerInputs = {
+      ...defaultInputs,
+      quantity: 25,
+      gradeDistribution: { A: 80, B: 15, C: 5 },
+    };
+    const ranking25 = rankMarketsByNetReturn(inputs25, tomato, markets);
+    const splitResult = optimizeSplitHarvest(inputs25, tomato, markets, ranking25.bestMarket);
+
+    const isSplitSuperior =
+      splitResult.recommendedStrategy === 'split' &&
+      splitResult.isSplitAdvantageous &&
+      splitResult.hasFeasibleSplit &&
+      ranking25.bestMarket !== null &&
+      splitResult.planTotals.totalNetReturn > ranking25.bestMarket.netReturn;
+
+    const gain = splitResult.netGainFromSplitting;
+
+    results.push({
+      test: '16. Higher net return with split harvest: Engine correctly identifies when dividing harvest produces more profit',
+      passed: isSplitSuperior,
+      details: `Strategy: "${splitResult.recommendedStrategy}" | Split Net: ₹${splitResult.planTotals.totalNetReturn.toLocaleString('en-IN')} vs Single Best (${ranking25.bestMarket?.market.name}): ₹${ranking25.bestMarket?.netReturn.toLocaleString('en-IN')} (Gain: +₹${gain.toLocaleString('en-IN')})`,
+    });
+  }
+
+  // Scenario 17: Single-market preference when split transport costs outweigh price advantage
+  {
+    const inputs10: FarmerInputs = {
+      ...defaultInputs,
+      quantity: 10,
+      gradeDistribution: { A: 40, B: 40, C: 20 },
+    };
+    const ranking10 = rankMarketsByNetReturn(inputs10, tomato, markets);
+    const splitResult = optimizeSplitHarvest(inputs10, tomato, markets, ranking10.bestMarket);
+
+    const prefersSingle =
+      splitResult.recommendedStrategy === 'single' &&
+      !splitResult.isSplitAdvantageous &&
+      ranking10.bestMarket !== null;
+
+    results.push({
+      test: '17. Single-market preference: Engine correctly prefers a single market when split transport costs outweigh price advantage',
+      passed: prefersSingle,
+      details: `Strategy: "${splitResult.recommendedStrategy}" | Split Advantageous: ${splitResult.isSplitAdvantageous} | Single Best: ${ranking10.bestMarket?.market.name} (Net: ₹${ranking10.bestMarket?.netReturn.toLocaleString('en-IN')})`,
     });
   }
 

@@ -23,6 +23,7 @@ import { TransportConfigForm } from './components/forms/TransportConfig';
 import { MetricCards } from './components/dashboard/MetricCards';
 import { ComparisonCard } from './components/dashboard/ComparisonCard';
 import { MarketRankingTable } from './components/markets/MarketRankingTable';
+import { SplitHarvestSection } from './components/dashboard/SplitHarvestSection';
 import { InfeasibleMarketsSection } from './components/markets/InfeasibleMarketsSection';
 import { FinancialBreakdownModal } from './components/dashboard/FinancialBreakdownModal';
 import { SensitivityAnalysis } from './components/dashboard/SensitivityAnalysis';
@@ -104,14 +105,14 @@ export const App: React.FC = () => {
     [ranking, inputs.gradeDistribution]
   );
 
-  // Optional Split-Harvest optimization
+  // Advanced Split-Harvest optimization
   const splitResult = useMemo(
     () =>
       optimizeSplitHarvest(
         inputs,
         currentCrop,
         markets,
-        ranking.bestMarket?.netReturn || 0
+        ranking.bestMarket
       ),
     [inputs, currentCrop, markets, ranking.bestMarket]
   );
@@ -299,13 +300,16 @@ export const App: React.FC = () => {
               />
             </div>
 
-            {/* Right Column: Ranked Markets, Waterfall Chart & Analysis */}
+            {/* Right Column: Ranked Markets, Split Harvest, Waterfall Chart & Analysis */}
             <div className="lg:col-span-7 space-y-6">
               {/* Feasible Single-Market Ranking Table */}
               <MarketRankingTable
                 feasibleMarkets={ranking.feasibleMarkets}
                 onSelectMarket={(m) => setSelectedBreakdownMarket(m)}
               />
+
+              {/* Split-Harvest Optimization Section */}
+              <SplitHarvestSection splitResult={splitResult} />
 
               {/* Financial Waterfall Chart */}
               <FinancialWaterfallChart bestMarket={ranking.bestMarket} />

@@ -171,19 +171,55 @@ export interface SplitHarvestAllocation {
   market: SimulatedMarket;
   allocatedQuintals: number;
   saleableQuintals: number;
+  physicalLossQuintals: number;
+  lossPercent: number;
   grossRevenue: number;
   transportCost: number;
+  transportTrips: number;
   marketFees: number;
   netReturn: number;
+  netReturnPerQuintal: number;
+}
+
+export interface SplitPlanTotals {
+  totalAllocatedQuintals: number;
+  totalLossQuintals: number;
+  totalSaleableQuintals: number;
+  totalGrossRevenue: number;
+  totalTransportCost: number;
+  totalMarketFees: number;
+  totalNetReturn: number;
+  netReturnPerQuintal: number;
+}
+
+export interface RejectedSplitPlan {
+  marketNames: string[];
+  proposedAllocations: number[];
+  rejectionReason: string;
 }
 
 export interface SplitHarvestResult {
+  recommendedStrategy: 'single' | 'split' | 'none';
+  baselineSingleMarket: MarketCalculationResult | null;
   allocations: SplitHarvestAllocation[];
-  totalAllocatedQuintals: number;
-  totalSaleableQuintals: number;
+  planTotals: SplitPlanTotals;
+  baselineTotals: SplitPlanTotals | null;
   totalNetReturn: number;
   singleBestNetReturn: number;
+  totalAllocatedQuintals: number;
+  totalSaleableQuintals: number;
   netGainFromSplitting: number;
+  netGainPerQuintal: number;
   isSplitAdvantageous: boolean;
+  hasFeasibleSplit: boolean;
   explanation: string;
+  strategyRationale: string;
+  rejectedPlans: RejectedSplitPlan[];
+  searchMetadata: {
+    plansEvaluated: number;
+    feasiblePlansCount: number;
+    discretizationStepQuintals: number;
+    assumptions: string[];
+    searchLimitationNotice?: string;
+  };
 }
