@@ -11,9 +11,17 @@ import { LandingFooter } from './LandingFooter';
 
 interface LandingPageProps {
   onOpenDashboard: () => void;
+  onOpenMandiPrices?: () => void;
+  onOpenMarketplace?: () => void;
+  onOpenReports?: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onOpenDashboard }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({
+  onOpenDashboard,
+  onOpenMandiPrices,
+  onOpenMarketplace,
+  onOpenReports,
+}) => {
   const handleLearnMore = () => {
     const el = document.getElementById('how-it-works');
     if (el) {
@@ -24,10 +32,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenDashboard }) => 
   return (
     <div className="min-h-screen bg-rural-cream text-rural-charcoal font-sans selection:bg-rural-mint selection:text-rural-deep flex flex-col">
       {/* 1. Transparent-to-Solid Sticky Navigation */}
-      <LandingNavbar onOpenDashboard={onOpenDashboard} />
+      <LandingNavbar
+        onOpenDashboard={onOpenDashboard}
+        onOpenMandiPrices={onOpenMandiPrices}
+        onOpenMarketplace={onOpenMarketplace}
+        onOpenReports={onOpenReports}
+      />
 
       {/* 2. Full-Width Immersive Agricultural Hero */}
-      <HeroSection onOpenDashboard={onOpenDashboard} onLearnMore={handleLearnMore} />
+      <HeroSection
+        onOpenDashboard={onOpenDashboard}
+        onOpenMarketplace={onOpenMarketplace}
+        onLearnMore={handleLearnMore}
+      />
 
       {/* 3. 3-Benefit Botanical Trust Strip */}
       <TrustStrip />
@@ -52,4 +69,3 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenDashboard }) => 
     </div>
   );
 };
-

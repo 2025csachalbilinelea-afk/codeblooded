@@ -23,7 +23,7 @@ export const Footer: React.FC = () => {
               <span>Transparent Calculations</span>
             </div>
             <p className="text-xs text-white/70 leading-relaxed font-sans">
-              Every travel expense, market commission, and produce loss estimate is calculated openly. All regional market prices and quotas in this prototype are demonstration sample models to help evaluate selling options.
+              Every travel expense, market commission, and produce loss estimate is calculated openly. Market prices and arrival volumes are retrieved dynamically from official AGMARKNET and data.gov.in agricultural feeds.
             </p>
           </div>
 
@@ -45,7 +45,7 @@ export const Footer: React.FC = () => {
           </div>
           <div className="flex items-center space-x-1.5 text-amber-300/80 text-center sm:text-right">
             <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
-            <span>Demonstration sample data only. Verify spot rates with your local mandi before dispatch.</span>
+            <span>Real-time APMC mandi intelligence. Spot modal prices updated daily from official AGMARKNET feeds.</span>
           </div>
         </div>
       </div>

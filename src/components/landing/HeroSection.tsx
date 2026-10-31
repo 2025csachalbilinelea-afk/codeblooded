@@ -1,13 +1,15 @@
 import React from 'react';
-import { ArrowRight, Compass, Sprout, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Compass, Sprout, ShieldCheck, Store } from 'lucide-react';
 
 interface HeroSectionProps {
   onOpenDashboard: () => void;
+  onOpenMarketplace?: () => void;
   onLearnMore: () => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   onOpenDashboard,
+  onOpenMarketplace,
   onLearnMore,
 }) => {
   return (
@@ -51,20 +53,34 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         </p>
 
         {/* Primary & Secondary Call To Actions */}
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="mt-10 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3.5 sm:gap-4">
+          {/* Button 1: Find My Best Market */}
           <button
             type="button"
             onClick={onOpenDashboard}
-            className="w-full sm:w-auto px-8 py-4 rounded-full bg-rural-fresh text-white font-medium text-base hover:bg-rural-fresh/90 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2.5 group cursor-pointer"
+            className="w-full sm:w-auto px-7 py-4 rounded-full bg-rural-fresh text-white font-medium text-base hover:bg-rural-fresh/90 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2.5 group cursor-pointer"
           >
             <span>Find My Best Market</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
 
+          {/* Button 2: Explore Bulk Marketplace */}
+          {onOpenMarketplace && (
+            <button
+              type="button"
+              onClick={onOpenMarketplace}
+              className="w-full sm:w-auto px-7 py-4 rounded-full bg-rural-forest text-white border border-rural-mint/40 font-medium text-base hover:bg-rural-deep hover:border-rural-mint shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2.5 group cursor-pointer"
+            >
+              <Store className="w-5 h-5 text-rural-fresh" />
+              <span>Explore Bulk Marketplace</span>
+            </button>
+          )}
+
+          {/* Button 3: How HarvestRoute Works */}
           <button
             type="button"
             onClick={onLearnMore}
-            className="w-full sm:w-auto px-7 py-4 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/25 font-medium text-base backdrop-blur-sm transition-all flex items-center justify-center space-x-2"
+            className="w-full sm:w-auto px-6 py-4 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/25 font-medium text-base backdrop-blur-sm transition-all flex items-center justify-center space-x-2 cursor-pointer"
           >
             <Compass className="w-4 h-4 text-rural-mint" />
             <span>How HarvestRoute Works</span>
@@ -80,4 +96,3 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     </section>
   );
 };
-

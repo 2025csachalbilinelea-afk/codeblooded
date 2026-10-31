@@ -55,7 +55,30 @@ export const TransportConfigForm: React.FC<TransportConfigProps> = ({
     }
   };
 
+  const handleMileageChange = (val: number) => {
+    onChange({
+      ownVehicle: {
+        ...transport.ownVehicle,
+        mileageKmPerLitre: val,
+      },
+    });
+  };
+
+  const handleFuelPriceChange = (val: number) => {
+    onChange({
+      ownVehicle: {
+        ...transport.ownVehicle,
+        fuelPricePerLitre: val,
+      },
+    });
+  };
+
   const currentRentalRate = transport.rentedVehicle.rentalRatePerKm ?? 35;
+
+  // Real-time fuel cost rate per km for Option A
+  const ownMileage = transport.ownVehicle.mileageKmPerLitre;
+  const ownFuelPrice = transport.ownVehicle.fuelPricePerLitre;
+  const fuelRatePerKm = ownMileage > 0 && ownFuelPrice > 0 ? ownFuelPrice / ownMileage : 0;
 
   return (
     <div className="bg-white rounded-3xl border border-rural-border shadow-rural-soft p-5 sm:p-6">
@@ -81,7 +104,7 @@ export const TransportConfigForm: React.FC<TransportConfigProps> = ({
         <button
           type="button"
           onClick={() => handleTypeChange('own')}
-          className={`p-4 rounded-2xl border text-left transition-all relative ${
+          className={`p-4 rounded-2xl border text-left transition-all relative cursor-pointer ${
             isOwn
               ? 'border-rural-fresh bg-rural-sage/80 ring-2 ring-rural-fresh/40 shadow-sm'
               : 'border-rural-border bg-rural-cream hover:bg-rural-sage/40'
@@ -108,7 +131,7 @@ export const TransportConfigForm: React.FC<TransportConfigProps> = ({
         <button
           type="button"
           onClick={() => handleTypeChange('rented')}
-          className={`p-4 rounded-2xl border text-left transition-all relative ${
+          className={`p-4 rounded-2xl border text-left transition-all relative cursor-pointer ${
             !isOwn
               ? 'border-rural-fresh bg-rural-sage/80 ring-2 ring-rural-fresh/40 shadow-sm'
               : 'border-rural-border bg-rural-cream hover:bg-rural-sage/40'
@@ -135,14 +158,15 @@ export const TransportConfigForm: React.FC<TransportConfigProps> = ({
       {/* Conditional Detailed Settings */}
       {isOwn ? (
         /* Option A Details */
-        <div className="bg-rural-cream rounded-2xl p-4.5 border border-rural-border space-y-3.5 mb-5">
+        <div className="bg-rural-cream rounded-2xl p-4.5 border border-rural-border space-y-4 mb-5">
+          {/* Header & Vehicle Space Dropdown (Unchanged) */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rural-border/70 pb-3">
             <div>
               <span className="text-xs font-semibold text-rural-forest block">
                 Automatic Own-Vehicle Cost Model
               </span>
               <p className="text-[11px] text-rural-muted">
-                Cost is estimated from distance, vehicle capacity, and standard travel expenses.
+                Cost is estimated from distance, vehicle capacity, and user-specified fuel expenses.
               </p>
             </div>
             <div className="flex items-center space-x-2">
@@ -162,33 +186,130 @@ export const TransportConfigForm: React.FC<TransportConfigProps> = ({
             </div>
           </div>
 
+          {/* Two Primary Inputs: Vehicle Mileage & Fuel Price */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Input 1: Vehicle Mileage */}
+            <div>
+              <label className="block text-xs font-semibold text-rural-charcoal mb-1">
+                Vehicle Mileage (km/litre) *
+              </label>
+              <div className="relative rounded-xl border border-rural-border bg-white focus-within:ring-2 focus-within:ring-rural-fresh">
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.5"
+                  value={transport.ownVehicle.mileageKmPerLitre || ''}
+                  onChange={(e) => handleMileageChange(parseFloat(e.target.value) || 0)}
+                  placeholder="10"
+                  className="w-full text-sm bg-transparent pl-3 pr-20 py-2.5 text-rural-forest font-bold focus:outline-none"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-rural-muted text-xs font-semibold">
+                  km/litre
+                </div>
+              </div>
+              {errors?.mileage ? (
+                <p className="text-[11px] text-rose-600 mt-1 font-medium flex items-center space-x-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  <span>{errors.mileage}</span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-rural-muted mt-1">
+                  Typical pickup/tempo mileage is 8 – 14 km/L.
+                </p>
+              )}
+            </div>
+
+            {/* Input 2: Fuel Price */}
+            <div>
+              <label className="block text-xs font-semibold text-rural-charcoal mb-1">
+                Fuel Price (₹/litre) *
+              </label>
+              <div className="relative rounded-xl border border-rural-border bg-white focus-within:ring-2 focus-within:ring-rural-fresh">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-rural-muted font-bold text-sm">
+                  ₹
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={transport.ownVehicle.fuelPricePerLitre || ''}
+                  onChange={(e) => handleFuelPriceChange(parseFloat(e.target.value) || 0)}
+                  placeholder="95"
+                  className="w-full text-sm bg-transparent pl-7 pr-16 py-2.5 text-rural-forest font-bold focus:outline-none"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-rural-muted text-xs font-semibold">
+                  per litre
+                </div>
+              </div>
+              {errors?.fuelPrice ? (
+                <p className="text-[11px] text-rose-600 mt-1 font-medium flex items-center space-x-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  <span>{errors.fuelPrice}</span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-rural-muted mt-1">
+                  Current local fuel rate at petrol/diesel pump.
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Transparent breakdown of what is included */}
           <div>
             <span className="text-[11px] font-semibold text-rural-forest uppercase tracking-wider block mb-2">
-              Included in this estimate:
+              Transportation Cost Breakdown Components:
             </span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
               <div className="bg-white p-2.5 rounded-xl border border-rural-border/70">
-                <span className="text-rural-muted text-[10px] block">Fuel</span>
-                <strong className="text-rural-forest font-semibold">Distance & Mileage</strong>
+                <span className="text-rural-muted text-[10px] block">Calculated Fuel Rate</span>
+                <strong className="text-emerald-800 font-bold block">
+                  {fuelRatePerKm > 0 ? `₹${fuelRatePerKm.toFixed(2)} / km` : 'Enter values'}
+                </strong>
+                <span className="text-[10px] text-rural-muted block mt-0.5">
+                  ({ownFuelPrice || 0} ÷ {ownMileage || 0} km/L)
+                </span>
               </div>
               <div className="bg-white p-2.5 rounded-xl border border-rural-border/70">
                 <span className="text-rural-muted text-[10px] block">Maintenance</span>
-                <strong className="text-rural-forest font-semibold">Road Wear & Tear</strong>
+                <strong className="text-rural-forest font-semibold block">
+                  ₹{transport.ownVehicle.maintenancePerKm || 2} / km
+                </strong>
+                <span className="text-[10px] text-rural-muted block mt-0.5">Road wear & tear</span>
               </div>
               <div className="bg-white p-2.5 rounded-xl border border-rural-border/70">
                 <span className="text-rural-muted text-[10px] block">Driver Allowance</span>
-                <strong className="text-rural-forest font-semibold">Standard Trip Fee</strong>
+                <strong className="text-rural-forest font-semibold block">
+                  ₹{transport.ownVehicle.driverCostPerTrip || 500} / trip
+                </strong>
+                <span className="text-[10px] text-rural-muted block mt-0.5">Driver trip fee</span>
               </div>
               <div className="bg-white p-2.5 rounded-xl border border-rural-border/70">
                 <span className="text-rural-muted text-[10px] block">Tolls & Parking</span>
-                <strong className="text-rural-forest font-semibold">Configured Charges</strong>
+                <strong className="text-rural-forest font-semibold block">
+                  ₹{transport.ownVehicle.tollAndOtherExpenses || 200} / trip
+                </strong>
+                <span className="text-[10px] text-rural-muted block mt-0.5">Highway toll fees</span>
               </div>
             </div>
           </div>
+
+          {/* Fuel Cost Formula Explanation Box */}
+          <div className="p-3 bg-white rounded-xl border border-rural-border/70 text-xs text-rural-muted leading-relaxed space-y-1">
+            <div className="text-rural-forest font-semibold">
+              Own-Vehicle Fuel Cost Calculation Formula:
+            </div>
+            <div className="font-mono text-[11px] text-rural-forest bg-rural-cream px-2.5 py-1.5 rounded-lg border border-rural-border">
+              Fuel Required (litres) = Total Travel Distance (km) ÷ Vehicle Mileage ({ownMileage || 10} km/L)
+              <br />
+              Fuel Cost (₹) = Fuel Required × Fuel Price (₹{ownFuelPrice || 95}/litre)
+            </div>
+            <p className="text-[11px] text-rural-muted pt-0.5">
+              • Two-way return trip distance ({transport.ownVehicle.returnTripRequired ? '2 × one-way distance' : 'one-way'}) and multi-trip consignment scaling ({trips} trip{trips > 1 ? 's' : ''}) are automatically accounted for without double-counting expenses.
+            </p>
+          </div>
         </div>
       ) : (
-        /* Option B Details */
+        /* Option B Details (COMPLETELY UNCHANGED) */
         <div className="bg-rural-cream rounded-2xl p-4.5 border border-rural-border space-y-3.5 mb-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Single Prominent Input: Rental Rate per km */}

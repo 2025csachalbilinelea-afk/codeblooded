@@ -104,7 +104,7 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ onOpenDashboard })
           <div className="flex items-center space-x-1.5 text-amber-300/80 max-w-lg text-center md:text-right">
             <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
             <span>
-              Sample Demonstration Data: Market prices, fees, and distances in this prototype are demonstration models for decision comparison.
+              Verified Mandi Intelligence: Market prices and arrivals are retrieved dynamically from official AGMARKNET and data.gov.in sources.
             </span>
           </div>
         </div>

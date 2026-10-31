@@ -57,8 +57,8 @@ export function validateFarmerInputs(inputs: FarmerInputs): ValidationResult {
     if (isNaN(own.mileageKmPerLitre) || own.mileageKmPerLitre <= 0) {
       errors.mileage = 'Vehicle mileage must be greater than 0 km/L.';
     }
-    if (isNaN(own.fuelPricePerLitre) || own.fuelPricePerLitre < 0) {
-      errors.fuelPrice = 'Fuel price cannot be negative.';
+    if (isNaN(own.fuelPricePerLitre) || own.fuelPricePerLitre <= 0) {
+      errors.fuelPrice = 'Fuel price must be greater than ₹0/litre.';
     }
     if (isNaN(own.maintenancePerKm) || own.maintenancePerKm < 0) {
       errors.maintenance = 'Maintenance cost cannot be negative.';

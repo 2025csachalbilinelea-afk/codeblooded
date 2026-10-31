@@ -97,7 +97,7 @@ export function calculateTransportationCost(
       };
     }
 
-    if (isNaN(own.fuelPricePerLitre) || own.fuelPricePerLitre < 0) {
+    if (isNaN(own.fuelPricePerLitre) || own.fuelPricePerLitre <= 0) {
       return {
         totalCost: 0,
         tripsCount: 0,
@@ -109,7 +109,7 @@ export function calculateTransportationCost(
         rentalCharges: 0,
         costPerQuintal: 0,
         isFeasible: false,
-        feasibilityReason: 'Fuel price cannot be negative.',
+        feasibilityReason: 'Fuel price must be greater than zero.',
       };
     }
 
