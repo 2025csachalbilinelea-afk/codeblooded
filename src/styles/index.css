@@ -56,6 +56,21 @@
   display: none;
 }
 
+.page-break {
+  break-after: page;
+  page-break-after: always;
+}
+
+.page-break-before {
+  break-before: page;
+  page-break-before: always;
+}
+
+.avoid-break {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -70,6 +85,18 @@
   }
   .print-only {
     display: block !important;
+  }
+  .page-break {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+  .page-break-before {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+  .avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
   table {
     page-break-inside: auto;

@@ -33,6 +33,7 @@ import {
   Info,
   X,
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface DynamicMarketSectionProps {
   farmerLocation: FarmerLocation;
@@ -211,6 +212,7 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
   discoveryLevel,
   apiErrorCategory,
 }) => {
+  const { language, t } = useLanguage();
   const [viewTab, setViewTab] = useState<'cards' | 'table' | 'map'>('cards');
   const [selectedProvenanceMandi, setSelectedProvenanceMandi] = useState<DynamicMandiEvaluation | null>(null);
 
@@ -304,17 +306,21 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
           <div>
             <label className="block text-[11px] font-semibold text-rural-muted uppercase tracking-wider mb-1 flex items-center space-x-1">
               <ArrowUpDown className="w-3 h-3 text-rural-primary" />
-              <span>Sort Mandis By</span>
+              <span>
+                {language === 'kn' ? 'ಮಂಡಿಗಳನ್ನು ವಿಂಗಡಿಸಿ' : language === 'hi' ? 'मंडियों को क्रमबद्ध करें' : 'Sort Mandis By'}
+              </span>
             </label>
             <select
               value={sortOption}
               onChange={(e) => onSortChange(e.target.value as MandiSortOption)}
               className="w-full text-xs bg-rural-cream border border-rural-border rounded-xl px-3 py-2 text-rural-charcoal focus:ring-2 focus:ring-rural-fresh font-medium"
             >
-              <option value="netRevenue">Highest Net Revenue (Take-Home)</option>
-              <option value="cropPrice">Highest Reported Price (₹/Qtl)</option>
-              <option value="roadDistance">Shortest Road Distance (km)</option>
-              <option value="transportCost">Lowest Transport Expense (₹)</option>
+              <option value="netRevenue">{t('step2.sortNetRevenue')}</option>
+              <option value="cropPrice">{t('step2.sortGrossPrice')}</option>
+              <option value="roadDistance">{t('step2.sortDistance')}</option>
+              <option value="transportCost">
+                {language === 'kn' ? 'ಕನಿಷ್ಠ ಸಾರಿಗೆ ವೆಚ್ಚ' : language === 'hi' ? 'न्यूनतम परिवहन खर्च' : 'Lowest Transport Expense (₹)'}
+              </option>
             </select>
           </div>
 
@@ -322,14 +328,16 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
           <div>
             <label className="block text-[11px] font-semibold text-rural-muted uppercase tracking-wider mb-1 flex items-center space-x-1">
               <Filter className="w-3 h-3 text-rural-primary" />
-              <span>State Filter</span>
+              <span>
+                {language === 'kn' ? 'ರಾಜ್ಯ ಫಿಲ್ಟರ್' : language === 'hi' ? 'राज्य फ़िल्टर' : 'State Filter'}
+              </span>
             </label>
             <select
               value={filters.state || 'ALL'}
               onChange={(e) => onFilterChange({ state: e.target.value })}
               className="w-full text-xs bg-rural-cream border border-rural-border rounded-xl px-3 py-2 text-rural-charcoal focus:ring-2 focus:ring-rural-fresh font-medium"
             >
-              <option value="ALL">All Discovered States</option>
+              <option value="ALL">{t('step2.allStates')}</option>
               {availableStates.map((st) => (
                 <option key={st} value={st}>
                   {st}
@@ -342,7 +350,7 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
           <div>
             <label className="block text-[11px] font-semibold text-rural-muted uppercase tracking-wider mb-1 flex items-center space-x-1">
               <Truck className="w-3 h-3 text-rural-primary" />
-              <span>Maximum Distance</span>
+              <span>{t('step2.searchRadiusLabel')}</span>
             </label>
             <select
               value={filters.maxDistanceKm || 0}
@@ -351,11 +359,21 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
               }
               className="w-full text-xs bg-rural-cream border border-rural-border rounded-xl px-3 py-2 text-rural-charcoal focus:ring-2 focus:ring-rural-fresh font-medium"
             >
-              <option value={0}>Any Distance</option>
-              <option value={100}>Within 100 km (Local)</option>
-              <option value={250}>Within 250 km (Regional)</option>
-              <option value={500}>Within 500 km (Inter-District)</option>
-              <option value={1000}>Within 1,000 km (Inter-State)</option>
+              <option value={0}>
+                {language === 'kn' ? 'ಯಾವುದೇ ದೂರ' : language === 'hi' ? 'कोई भी दूरी' : 'Any Distance'}
+              </option>
+              <option value={100}>
+                {language === 'kn' ? '೧೦೦ ಕಿಮೀ ಒಳಗಡೆ (ಸ್ಥಳೀಯ)' : language === 'hi' ? '१०० किमी के भीतर (स्थानीय)' : 'Within 100 km (Local)'}
+              </option>
+              <option value={250}>
+                {language === 'kn' ? '೨೫೦ ಕಿಮೀ ಒಳಗಡೆ (ಪ್ರಾದೇಶಿಕ)' : language === 'hi' ? '२५० किमी के भीतर (क्षेत्रीय)' : 'Within 250 km (Regional)'}
+              </option>
+              <option value={500}>
+                {language === 'kn' ? '೫೦೦ ಕಿಮೀ ಒಳಗಡೆ (ಅಂತರ-ಜಿಲ್ಲೆ)' : language === 'hi' ? '५०० किमी के भीतर (अंतर-जिला)' : 'Within 500 km (Inter-District)'}
+              </option>
+              <option value={1000}>
+                {language === 'kn' ? '೧,೦೦೦ ಕಿಮೀ ಒಳಗಡೆ (ಅಂತರ-ರಾಜ್ಯ)' : language === 'hi' ? '१,००० किमी के भीतर (अंतर-राज्य)' : 'Within 1,000 km (Inter-State)'}
+              </option>
             </select>
           </div>
 

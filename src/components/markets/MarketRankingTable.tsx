@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { MarketCalculationResult } from '../../types/agriculture';
 import { formatINR, formatPercent } from '../../utils/currency';
 import { ArrowUpDown, Eye, MapPin, Building2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface MarketRankingTableProps {
   feasibleMarkets: MarketCalculationResult[];
@@ -14,6 +15,7 @@ export const MarketRankingTable: React.FC<MarketRankingTableProps> = ({
   feasibleMarkets,
   onSelectMarket,
 }) => {
+  const { language, t } = useLanguage();
   const [sortField, setSortField] = useState<SortField>('netReturn');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
 
@@ -55,14 +57,15 @@ export const MarketRankingTable: React.FC<MarketRankingTableProps> = ({
         <div>
           <div className="flex items-center space-x-2">
             <h3 className="text-xl font-serif font-bold text-rural-forest">
-              Markets Compared
+              {t('step3.rankingTableTitle')}
             </h3>
             <span className="text-xs bg-rural-mint text-rural-forest font-semibold px-2.5 py-0.5 rounded-full border border-rural-fresh/40">
-              {feasibleMarkets.length} Destinations Available
+              {feasibleMarkets.length}{' '}
+              {language === 'kn' ? 'ಮಂಡಿಗಳು' : language === 'hi' ? 'मंडियां' : 'Destinations Available'}
             </span>
           </div>
           <p className="text-xs sm:text-sm text-rural-muted mt-1 font-sans">
-            Markets are ranked by estimated earnings after costs, subject to market limits and other constraints.
+            {t('step3.rankingTableSubtitle')}
           </p>
         </div>
       </div>
@@ -72,13 +75,13 @@ export const MarketRankingTable: React.FC<MarketRankingTableProps> = ({
         <table className="w-full text-left text-xs sm:text-sm border-collapse">
           <thead>
             <tr className="bg-rural-sage/60 border-b border-rural-border text-rural-forest font-semibold uppercase tracking-wider text-[11px]">
-              <th className="py-3.5 px-4 font-sans">Rank & Market</th>
+              <th className="py-3.5 px-4 font-sans">{t('step3.thRankMarket')}</th>
               <th
                 className="py-3.5 px-3 cursor-pointer hover:bg-rural-sage transition-colors font-sans"
                 onClick={() => handleSort('distance')}
               >
                 <div className="flex items-center space-x-1">
-                  <span>Distance</span>
+                  <span>{t('step3.thDistance')}</span>
                   <ArrowUpDown className="w-3 h-3 text-rural-muted" />
                 </div>
               </th>
@@ -87,17 +90,21 @@ export const MarketRankingTable: React.FC<MarketRankingTableProps> = ({
                 onClick={() => handleSort('priceA')}
               >
                 <div className="flex items-center space-x-1">
-                  <span>Offered Price</span>
+                  <span>{t('step3.thQuotedPrice')}</span>
                   <ArrowUpDown className="w-3 h-3 text-rural-muted" />
                 </div>
               </th>
-              <th className="py-3.5 px-3 font-sans">Max Accepted</th>
+              <th className="py-3.5 px-3 font-sans">
+                {language === 'kn' ? 'ಗರಿಷ್ಠ ಸಾಮರ್ಥ್ಯ' : language === 'hi' ? 'अधिकतम क्षमता' : 'Max Accepted'}
+              </th>
               <th
                 className="py-3.5 px-3 cursor-pointer hover:bg-rural-sage transition-colors font-sans"
                 onClick={() => handleSort('spoilage')}
               >
                 <div className="flex items-center space-x-1">
-                  <span>Loss on Way</span>
+                  <span>
+                    {language === 'kn' ? 'ಸಾಗಾಣಿಕೆ ನಷ್ಟ' : language === 'hi' ? 'रास्ते का नुकसान' : 'Loss on Way'}
+                  </span>
                   <ArrowUpDown className="w-3 h-3 text-rural-muted" />
                 </div>
               </th>
@@ -106,21 +113,23 @@ export const MarketRankingTable: React.FC<MarketRankingTableProps> = ({
                 onClick={() => handleSort('transportCost')}
               >
                 <div className="flex items-center space-x-1">
-                  <span>Transport Cost</span>
+                  <span>{t('step3.thTransportCost')}</span>
                   <ArrowUpDown className="w-3 h-3 text-rural-muted" />
                 </div>
               </th>
-              <th className="py-3.5 px-3 font-sans">Market Fees</th>
+              <th className="py-3.5 px-3 font-sans">{t('step3.thMandiFees')}</th>
               <th
                 className="py-3.5 px-4 text-right cursor-pointer hover:bg-rural-sage transition-colors font-sans"
                 onClick={() => handleSort('netReturn')}
               >
                 <div className="flex items-center justify-end space-x-1 text-rural-forest font-bold">
-                  <span>Money You Keep</span>
+                  <span>{t('step3.thNetTakeHome')}</span>
                   <ArrowUpDown className="w-3 h-3 text-rural-fresh" />
                 </div>
               </th>
-              <th className="py-3.5 px-3 text-center font-sans">Details</th>
+              <th className="py-3.5 px-3 text-center font-sans">
+                {language === 'kn' ? 'ವಿವರ' : language === 'hi' ? 'विवरण' : 'Details'}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rural-border/50 font-medium">

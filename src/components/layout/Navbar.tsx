@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { BrandLogo } from '../common/BrandLogo';
+import { useLanguage } from '../../i18n/LanguageContext';
+import { Language } from '../../i18n/types';
 import {
   AlertCircle,
   RotateCcw,
@@ -12,6 +14,7 @@ import {
   FileText,
   Menu,
   X,
+  Globe,
 } from 'lucide-react';
 
 export type AppView = 'landing' | 'dashboard' | 'marketplace' | 'reports';
@@ -36,6 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   priceStatus = 'CACHED',
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { language, setLanguage, t } = useLanguage();
 
   const handleNavClick = (view: AppView, step?: 1 | 2 | 3) => {
     setIsMobileMenuOpen(false);
@@ -82,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <LayoutDashboard className="w-3.5 h-3.5 text-rural-mint" />
-                <span>Farmer Dashboard</span>
+                <span>{t('nav.dashboard', 'Farmer Dashboard')}</span>
               </button>
 
               <button
@@ -95,7 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <Store className="w-3.5 h-3.5 text-rural-fresh" />
-                <span>Live Mandi Prices</span>
+                <span>{t('nav.livePrices', 'Live Mandi Prices')}</span>
               </button>
 
               <button
@@ -108,7 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <Building2 className="w-3.5 h-3.5 text-amber-300" />
-                <span>Bulk Buyer Marketplace</span>
+                <span>{t('nav.marketplace', 'Bulk Buyer Marketplace')}</span>
               </button>
 
               <button
@@ -121,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <FileText className="w-3.5 h-3.5 text-rural-mint" />
-                <span>Reports</span>
+                <span>{t('nav.report', 'Print Report')}</span>
               </button>
             </nav>
           </div>
@@ -155,18 +159,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
-            {/* Test Runner / Calculator Status */}
-            {onToggleVerification && (
-              <button
-                type="button"
-                onClick={onToggleVerification}
-                className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-rural-deep hover:bg-black/30 text-rural-mint border border-rural-primary/40 transition-colors cursor-pointer"
-                title="Verify calculation engine status"
+            {/* Clean & Accessible Language Selector Dropdown */}
+            <div className="flex items-center space-x-1.5 bg-rural-deep/90 border border-rural-primary/60 rounded-xl px-2.5 py-1 text-white shadow-sm hover:border-rural-fresh transition-all">
+              <Globe className="w-3.5 h-3.5 text-rural-fresh shrink-0" />
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as Language)}
+                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer pr-1"
+                aria-label="Select Language"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-rural-fresh" />
-                <span>Calculator Ready</span>
-              </button>
-            )}
+                <option value="en" className="bg-rural-deep text-white font-medium">English</option>
+                <option value="kn" className="bg-rural-deep text-white font-medium">ಕನ್ನಡ (Kannada)</option>
+                <option value="hi" className="bg-rural-deep text-white font-medium">हिन्दी (Hindi)</option>
+              </select>
+            </div>
 
             {/* Reset */}
             {onResetDefaults && (
@@ -177,7 +183,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 title="Reset all inputs to recommended defaults"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset</span>
+                <span>{t('nav.resetDefaults', 'Reset')}</span>
               </button>
             )}
 
@@ -190,7 +196,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 title="Print or export market evaluation dossier"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span>Report</span>
+                <span>{t('nav.report', 'Report')}</span>
               </button>
             )}
 
@@ -211,7 +217,24 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile / Tablet Drawer */}
       {isMobileMenuOpen && (
-        <div className="xl:hidden bg-rural-deep border-t border-white/10 px-4 pt-3 pb-5 space-y-2 text-white animate-fade-in shadow-xl">
+        <div className="xl:hidden bg-rural-deep border-t border-white/10 px-4 pt-3 pb-5 space-y-3 text-white animate-fade-in shadow-xl">
+          {/* Mobile Language Switcher */}
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/10 border border-white/15">
+            <div className="flex items-center space-x-2 text-xs font-semibold">
+              <Globe className="w-4 h-4 text-rural-fresh" />
+              <span>{t('nav.selectLanguage', 'Language')}</span>
+            </div>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as Language)}
+              className="bg-rural-deep text-xs font-bold text-white px-2.5 py-1 rounded-lg border border-rural-primary/60 focus:outline-none cursor-pointer"
+            >
+              <option value="en">English</option>
+              <option value="kn">ಕನ್ನಡ (Kannada)</option>
+              <option value="hi">हिन्दी (Hindi)</option>
+            </select>
+          </div>
+
           <div className="flex flex-col space-y-1 text-sm font-medium">
             <button
               type="button"
@@ -234,7 +257,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <LayoutDashboard className="w-4 h-4 text-rural-mint" />
-              <span>Farmer Dashboard (3-Step Workflow)</span>
+              <span>{t('nav.dashboard', 'Farmer Dashboard')}</span>
             </button>
 
             <button
@@ -247,7 +270,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Store className="w-4 h-4 text-rural-fresh" />
-              <span>Live Mandi Prices</span>
+              <span>{t('nav.livePrices', 'Live Mandi Prices')}</span>
             </button>
 
             <button
@@ -260,7 +283,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Building2 className="w-4 h-4 text-amber-300" />
-              <span>Bulk Buyer Marketplace (B2B Procurement)</span>
+              <span>{t('nav.marketplace', 'Bulk Buyer Marketplace')}</span>
             </button>
 
             <button
@@ -273,7 +296,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <FileText className="w-4 h-4 text-rural-mint" />
-              <span>Reports & Dossier</span>
+              <span>{t('nav.report', 'Print Report')}</span>
             </button>
           </div>
 
@@ -288,21 +311,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-white/10 text-white/80 hover:bg-white/20"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Defaults</span>
+                <span>{t('nav.resetDefaults', 'Reset Defaults')}</span>
               </button>
             )}
 
-            {onToggleVerification && (
+            {onPrint && (
               <button
                 type="button"
                 onClick={() => {
                   setIsMobileMenuOpen(false);
-                  onToggleVerification();
+                  onPrint();
                 }}
-                className="flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-rural-forest text-rural-mint hover:bg-black/30"
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-rural-fresh text-white font-semibold"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-rural-fresh" />
-                <span>Calculator Status</span>
+                <Printer className="w-3.5 h-3.5" />
+                <span>{t('nav.report', 'Print Report')}</span>
               </button>
             )}
           </div>

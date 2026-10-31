@@ -4,6 +4,7 @@ import {
   calculateProduceGradeRevenue,
   MarketPriceReferenceInfo,
 } from '../../engine/gradePricing';
+import { useLanguage } from '../../i18n/LanguageContext';
 import { formatINR } from '../../utils/currency';
 import {
   Award,
@@ -12,7 +13,6 @@ import {
   Layers,
   Boxes,
   TrendingUp,
-  Truck,
   ShieldCheck,
   Scale,
   Sparkles,
@@ -43,6 +43,8 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
   onDistributionChange,
   error,
 }) => {
+  const { t, getCropName } = useLanguage();
+
   const breakdown = calculateProduceGradeRevenue({
     mode: gradePricingMode,
     distribution: gradeDistribution,
@@ -66,6 +68,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
   const sum = (gradeDistribution.A || 0) + (gradeDistribution.B || 0) + (gradeDistribution.C || 0);
   const isValid = Math.abs(sum - 100) <= 0.05;
   const remaining = Math.round((100 - sum) * 10) / 10;
+  const localizedCropName = getCropName(crop.id, crop.name);
 
   return (
     <div className="bg-white rounded-3xl border border-rural-border shadow-rural-soft p-5 sm:p-7 space-y-6">
@@ -77,10 +80,10 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
           </div>
           <div>
             <h2 className="text-lg font-serif font-bold text-rural-forest">
-              Produce Quality & Grade Distribution
+              {t('step1.gradeSectionTitle', 'Produce Quality & Grade Distribution')}
             </h2>
             <p className="text-xs text-rural-muted">
-              Distribute your {crop.name} by commercial quality grades or sell the entire harvest in bulk.
+              {t('step1.gradeSectionSubtitle', 'Distribute your produce by commercial quality grades or sell the entire harvest in bulk.')} ({localizedCropName})
             </p>
           </div>
         </div>
@@ -88,9 +91,11 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
         {/* Live Reference Price Badge */}
         <div className="flex items-center space-x-2 bg-rural-cream px-3 py-1.5 rounded-2xl border border-rural-border self-start sm:self-auto">
           <TrendingUp className="w-4 h-4 text-emerald-700" />
-          <span className="text-xs text-rural-muted font-medium">Ref Price (Grade A):</span>
+          <span className="text-xs text-rural-muted font-medium">
+            {t('step1.metric1Ref', 'Ref Price (Grade A)')}:
+          </span>
           <span className="text-xs font-bold text-emerald-900">
-            {formatINR(marketReference.price)}/Qtl
+            {formatINR(marketReference.price)} {t('common.perQuintal', '/Qtl')}
           </span>
           <span
             className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
@@ -99,7 +104,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
                 : 'bg-emerald-50 text-emerald-800 border-emerald-300'
             }`}
           >
-            {marketReference.isCached ? 'CACHED' : 'LIVE'}
+            {marketReference.isCached ? t('common.cached', 'CACHED') : t('common.live', 'LIVE')}
           </span>
         </div>
       </div>
@@ -120,7 +125,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
             <div className="flex items-center space-x-2">
               <Sparkles className="w-4 h-4 text-rural-primary" />
               <span className="font-serif font-bold text-sm sm:text-base text-rural-forest">
-                OPTION A: I Know My Produce Grades
+                {t('step1.optionATitle', 'OPTION A: I Know My Produce Grades')}
               </span>
             </div>
             <div
@@ -134,7 +139,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
             </div>
           </div>
           <p className="text-xs text-rural-muted leading-relaxed">
-            Specify the percentage split of your harvest across Grade A, Grade B, and Grade C to compute your weighted average selling price.
+            {t('step1.optionADesc', 'Specify the percentage split of your harvest across Grade A, Grade B, and Grade C to compute your weighted average selling price.')}
           </p>
         </button>
 
@@ -152,7 +157,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
             <div className="flex items-center space-x-2">
               <Boxes className="w-4 h-4 text-amber-700" />
               <span className="font-serif font-bold text-sm sm:text-base text-rural-forest">
-                OPTION B: Sell the Entire Harvest in Bulk
+                {t('step1.optionBTitle', 'OPTION B: Sell the Entire Harvest in Bulk')}
               </span>
             </div>
             <div
@@ -166,7 +171,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
             </div>
           </div>
           <p className="text-xs text-rural-muted leading-relaxed">
-            I'm not sure about grades — sell everything in bulk using standard Grade B market benchmark pricing (10% below Grade A).
+            {t('step1.optionBDesc', "I'm not sure about grades — sell everything in bulk using standard Grade B market benchmark pricing (10% below Grade A).")}
           </p>
         </button>
       </div>
@@ -176,10 +181,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
         <div className="flex items-center space-x-2">
           <Scale className="w-4 h-4 text-rural-primary shrink-0" />
           <span className="font-semibold text-rural-forest">
-            Grade Price Ratios:
-          </span>
-          <span className="text-rural-muted">
-            Grade A = 100% (Market Price) • Grade B = 90% (–10%) • Grade C = 75% (–25%)
+            {t('step1.gradeRatios', 'Grade Price Ratios: Grade A = 100% (Market Price) • Grade B = 90% (–10%) • Grade C = 75% (–25%)')}
           </span>
         </div>
         <div className="flex items-center space-x-3 text-[11px] font-semibold">
@@ -197,35 +199,35 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[11px] font-semibold text-rural-muted mr-1 flex items-center">
-                <Layers className="w-3 h-3 mr-1" /> Quick Presets:
+                <Layers className="w-3 h-3 mr-1" /> {t('step1.presetsLabel', 'Quick Presets:')}
               </span>
               <button
                 type="button"
                 onClick={() => applyPreset(40, 40, 20)}
                 className="text-xs px-2.5 py-1 rounded-xl bg-white hover:bg-rural-sage text-rural-forest border border-rural-border transition-colors font-medium cursor-pointer"
               >
-                Standard (40/40/20)
+                {t('step1.presetStandard', 'Standard (40/40/20)')}
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset(50, 35, 15)}
                 className="text-xs px-2.5 py-1 rounded-xl bg-white hover:bg-rural-sage text-rural-forest border border-rural-border transition-colors font-medium cursor-pointer"
               >
-                Balanced (50/35/15)
+                {t('step1.presetBalanced', 'Balanced (50/35/15)')}
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset(70, 20, 10)}
                 className="text-xs px-2.5 py-1 rounded-xl bg-white hover:bg-rural-sage text-rural-forest border border-rural-border transition-colors font-medium cursor-pointer"
               >
-                Prime Lot (70/20/10)
+                {t('step1.presetPrime', 'Prime Lot (70/20/10)')}
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset(100, 0, 0)}
                 className="text-xs px-2.5 py-1 rounded-xl bg-white hover:bg-rural-sage text-rural-forest border border-rural-border transition-colors font-medium cursor-pointer"
               >
-                100% Grade A
+                {t('step1.presetAllA', '100% Grade A')}
               </button>
             </div>
 
@@ -241,13 +243,13 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
                 {isValid ? (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Total: 100% (Valid)</span>
+                    <span>{t('step1.totalValid', 'Total: 100% (Valid)')}</span>
                   </>
                 ) : (
                   <>
                     <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
                     <span>
-                      Total: {sum}% ({remaining > 0 ? `${remaining}% remaining` : `${Math.abs(remaining)}% over`})
+                      {t('step1.totalInvalid', 'Total')}: {sum}% ({remaining > 0 ? `${remaining}% ${t('step1.remaining', 'remaining')}` : `${Math.abs(remaining)}% over`})
                     </span>
                   </>
                 )}
@@ -260,9 +262,9 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
             <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start space-x-2">
               <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold">Grade percentages must total exactly 100%</p>
+                <p className="font-semibold">{t('step1.gradeValidationAlert', 'Grade percentages must total exactly 100%. Please adjust values to calculate grade-based revenue.')}</p>
                 <p className="text-[11px] text-rose-700 mt-0.5">
-                  Currently entered total is {sum}%. {remaining > 0 ? `Please assign the remaining ${remaining}% across your grades.` : `Please reduce values by ${Math.abs(remaining)}% to equal 100%.`} Revenue calculations will activate once total reaches 100%.
+                  Currently entered total is {sum}%. {remaining > 0 ? `Please assign the remaining ${remaining}% across your grades.` : `Please reduce values by ${Math.abs(remaining)}% to equal 100%.`}
                 </p>
               </div>
             </div>
@@ -275,7 +277,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
               <div className="flex items-center justify-between">
                 <span className="font-serif font-bold text-emerald-950 text-sm flex items-center space-x-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block" />
-                  <span>Grade A (Premium)</span>
+                  <span>{t('step1.gradeAPremium', 'Grade A (Premium)')}</span>
                 </span>
                 <span className="text-xs font-bold text-emerald-900 font-mono">
                   {formatINR(breakdown.gradeAPrice)}/Qtl
@@ -294,7 +296,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
                 <span className="text-xs font-bold text-emerald-900">%</span>
               </div>
               <p className="text-[10px] text-emerald-800/80 leading-tight">
-                Top export & supermarket quality; uniform color, unblemished produce.
+                {t('step1.gradeADesc', 'Top export & supermarket quality; uniform color, unblemished produce.')}
               </p>
             </div>
 
@@ -303,7 +305,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
               <div className="flex items-center justify-between">
                 <span className="font-serif font-bold text-amber-950 text-sm flex items-center space-x-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-                  <span>Grade B (Fair Avg)</span>
+                  <span>{t('step1.gradeBFair', 'Grade B (Fair Avg)')}</span>
                 </span>
                 <span className="text-xs font-bold text-amber-900 font-mono">
                   {formatINR(breakdown.gradeBPrice)}/Qtl
@@ -322,7 +324,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
                 <span className="text-xs font-bold text-amber-900">%</span>
               </div>
               <p className="text-[10px] text-amber-800/80 leading-tight">
-                Standard mandi market produce; minor cosmetic marks, good freshness.
+                {t('step1.gradeBDesc', 'Standard mandi market produce; minor cosmetic marks, good freshness.')}
               </p>
             </div>
 
@@ -331,7 +333,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
               <div className="flex items-center justify-between">
                 <span className="font-serif font-bold text-stone-900 text-sm flex items-center space-x-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-stone-500 inline-block" />
-                  <span>Grade C (Processing)</span>
+                  <span>{t('step1.gradeCProcessing', 'Grade C (Processing)')}</span>
                 </span>
                 <span className="text-xs font-bold text-stone-800 font-mono">
                   {formatINR(breakdown.gradeCPrice)}/Qtl
@@ -350,7 +352,7 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
                 <span className="text-xs font-bold text-stone-800">%</span>
               </div>
               <p className="text-[10px] text-stone-600 leading-tight">
-                Smaller size, slight spotting or ripeness; factory pulp and bulk processing.
+                {t('step1.gradeCDesc', 'Smaller size, slight spotting or ripeness; factory pulp and bulk processing.')}
               </p>
             </div>
           </div>
@@ -359,46 +361,46 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
           {isValid && (
             <div className="bg-rural-cream rounded-2xl p-4.5 border border-rural-border space-y-3">
               <span className="text-xs font-semibold text-rural-forest block">
-                Grade-Wise Saleable Quantity & Value Breakdown:
+                {t('step1.gradeBreakdownTitle', 'Grade-Wise Saleable Quantity & Value Breakdown:')}
               </span>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                 <div className="bg-white p-3 rounded-xl border border-rural-border">
                   <span className="text-rural-muted text-[10px] block">Grade A Volume</span>
                   <span className="font-bold text-emerald-800 block text-sm">
-                    {breakdown.gradeAQuantityQuintals.toFixed(1)} Qtl
+                    {breakdown.gradeAQuantityQuintals.toFixed(1)} {t('common.quintal', 'Qtl')}
                   </span>
                   <span className="text-[10px] text-rural-muted block mt-0.5">
-                    @ {formatINR(breakdown.gradeAPrice)}/Qtl = {formatINR(breakdown.gradeAValue)}
+                    @ {formatINR(breakdown.gradeAPrice)} = {formatINR(breakdown.gradeAValue)}
                   </span>
                 </div>
 
                 <div className="bg-white p-3 rounded-xl border border-rural-border">
                   <span className="text-rural-muted text-[10px] block">Grade B Volume</span>
                   <span className="font-bold text-amber-800 block text-sm">
-                    {breakdown.gradeBQuantityQuintals.toFixed(1)} Qtl
+                    {breakdown.gradeBQuantityQuintals.toFixed(1)} {t('common.quintal', 'Qtl')}
                   </span>
                   <span className="text-[10px] text-rural-muted block mt-0.5">
-                    @ {formatINR(breakdown.gradeBPrice)}/Qtl = {formatINR(breakdown.gradeBValue)}
+                    @ {formatINR(breakdown.gradeBPrice)} = {formatINR(breakdown.gradeBValue)}
                   </span>
                 </div>
 
                 <div className="bg-white p-3 rounded-xl border border-rural-border">
                   <span className="text-rural-muted text-[10px] block">Grade C Volume</span>
                   <span className="font-bold text-stone-700 block text-sm">
-                    {breakdown.gradeCQuantityQuintals.toFixed(1)} Qtl
+                    {breakdown.gradeCQuantityQuintals.toFixed(1)} {t('common.quintal', 'Qtl')}
                   </span>
                   <span className="text-[10px] text-rural-muted block mt-0.5">
-                    @ {formatINR(breakdown.gradeCPrice)}/Qtl = {formatINR(breakdown.gradeCValue)}
+                    @ {formatINR(breakdown.gradeCPrice)} = {formatINR(breakdown.gradeCValue)}
                   </span>
                 </div>
 
                 <div className="bg-white p-3 rounded-xl border border-rural-border">
-                  <span className="text-rural-muted text-[10px] block">Weighted Avg Price</span>
+                  <span className="text-rural-muted text-[10px] block">{t('step1.weightedAvgPrice', 'Weighted Avg Price')}</span>
                   <span className="font-bold text-rural-forest block text-sm">
-                    {formatINR(breakdown.effectiveSellingPricePerQuintal)}/Qtl
+                    {formatINR(breakdown.effectiveSellingPricePerQuintal)}{t('common.perQuintal', '/Qtl')}
                   </span>
                   <span className="text-[10px] text-emerald-700 block mt-0.5 font-semibold">
-                    Gross: {formatINR(breakdown.estimatedGrossSellingValue)}
+                    {t('step1.metric3Gross', 'Gross')}: {formatINR(breakdown.estimatedGrossSellingValue)}
                   </span>
                 </div>
               </div>
@@ -411,41 +413,41 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
           <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-2">
             <div className="flex items-center space-x-2 text-amber-900 font-semibold text-sm">
               <Boxes className="w-4 h-4 text-amber-700" />
-              <span>Bulk selling estimate – Grade B equivalent pricing.</span>
+              <span>{t('step1.bulkBadge', 'Bulk selling estimate – Grade B equivalent pricing.')}</span>
             </div>
             <p className="text-xs text-amber-800/90 leading-relaxed">
-              When selling in bulk without pre-sorting, mandis value the entire lot at standard Grade B wholesale rate (₹{breakdown.gradeBPrice.toLocaleString('en-IN')}/Qtl), which is 10% below Grade A benchmark ({formatINR(breakdown.marketReferencePrice)}/Qtl).
+              {t('step1.bulkDesc', 'When selling in bulk without pre-sorting, mandis value the entire lot at standard Grade B wholesale rate (10% below Grade A market benchmark).')}
             </p>
           </div>
 
           <div className="bg-rural-cream rounded-2xl p-4.5 border border-rural-border">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
               <div className="bg-white p-3 rounded-xl border border-rural-border">
-                <span className="text-rural-muted text-[10px] block">Market Reference (Grade A)</span>
+                <span className="text-rural-muted text-[10px] block">{t('step1.metric1Ref', 'Market Reference')}</span>
                 <span className="font-bold text-rural-forest block text-sm">
-                  {formatINR(breakdown.marketReferencePrice)}/Qtl
+                  {formatINR(breakdown.marketReferencePrice)}{t('common.perQuintal', '/Qtl')}
                 </span>
-                <span className="text-[10px] text-rural-muted block mt-0.5">Daily modal rate</span>
+                <span className="text-[10px] text-rural-muted block mt-0.5">Grade A</span>
               </div>
 
               <div className="bg-white p-3 rounded-xl border border-rural-border">
-                <span className="text-rural-muted text-[10px] block">Bulk Selling Rate (Grade B)</span>
+                <span className="text-rural-muted text-[10px] block">{t('step1.bulkRate', 'Bulk Selling Rate (Grade B)')}</span>
                 <span className="font-bold text-amber-800 block text-sm">
-                  {formatINR(breakdown.gradeBPrice)}/Qtl
+                  {formatINR(breakdown.gradeBPrice)}{t('common.perQuintal', '/Qtl')}
                 </span>
-                <span className="text-[10px] text-rural-muted block mt-0.5">90% of market reference</span>
+                <span className="text-[10px] text-rural-muted block mt-0.5">90% of reference</span>
               </div>
 
               <div className="bg-white p-3 rounded-xl border border-rural-border">
-                <span className="text-rural-muted text-[10px] block">Eligible Harvest</span>
+                <span className="text-rural-muted text-[10px] block">{t('step1.eligibleHarvest', 'Eligible Harvest')}</span>
                 <span className="font-bold text-rural-forest block text-sm">
-                  {breakdown.eligibleSellingQuantityQuintals.toFixed(1)} Qtl
+                  {breakdown.eligibleSellingQuantityQuintals.toFixed(1)} {t('common.quintal', 'Qtl')}
                 </span>
                 <span className="text-[10px] text-rural-muted block mt-0.5">After transit loss</span>
               </div>
 
               <div className="bg-white p-3 rounded-xl border border-rural-border">
-                <span className="text-rural-muted text-[10px] block">Estimated Gross Value</span>
+                <span className="text-rural-muted text-[10px] block">{t('step1.metric3Gross', 'Estimated Gross Value')}</span>
                 <span className="font-bold text-emerald-800 block text-sm">
                   {formatINR(breakdown.estimatedGrossSellingValue)}
                 </span>
@@ -464,11 +466,11 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
           <div className="flex items-center space-x-2">
             <ShieldCheck className="w-5 h-5 text-rural-primary" />
             <h3 className="font-serif font-bold text-base text-rural-forest">
-              Estimated Revenue & Net In-Pocket Take-Home
+              {t('step1.estimatedRevenueTitle', 'Estimated Revenue & Net In-Pocket Take-Home')}
             </h3>
           </div>
           <span className="text-xs text-rural-muted">
-            {gradePricingMode === 'grades' ? 'Option A: Grade-Weighted Pricing' : 'Option B: Bulk Grade B Pricing'}
+            {gradePricingMode === 'grades' ? t('step1.optionATitle', 'Option A: Grade-Weighted Pricing') : t('step1.optionBTitle', 'Option B: Bulk Grade B Pricing')}
           </span>
         </div>
 
@@ -477,71 +479,71 @@ export const GradeDistributionForm: React.FC<GradeDistributionProps> = ({
             {/* Metric 1 */}
             <div className="p-3 rounded-xl bg-rural-cream border border-rural-border">
               <span className="text-[10px] font-bold uppercase text-rural-muted block">
-                1. Market Reference
+                {t('step1.metric1Ref', '1. Market Reference')}
               </span>
               <span className="font-bold text-rural-forest text-sm block mt-1">
                 {formatINR(breakdown.marketReferencePrice)} / Qtl
               </span>
               <span className="text-[10px] text-rural-muted block mt-0.5">
-                {marketReference.isCached ? 'Cached APMC Quote' : 'Live AGMARKNET Quote'}
+                {marketReference.isCached ? t('common.cached', 'Cached APMC Quote') : t('common.live', 'Live AGMARKNET Quote')}
               </span>
             </div>
 
             {/* Metric 2 */}
             <div className="p-3 rounded-xl bg-rural-cream border border-rural-border">
               <span className="text-[10px] font-bold uppercase text-rural-muted block">
-                2. Grade-Adjusted Rate
+                {t('step1.metric2Adjusted', '2. Grade-Adjusted Rate')}
               </span>
               <span className="font-bold text-rural-forest text-sm block mt-1">
                 {formatINR(breakdown.effectiveSellingPricePerQuintal)} / Qtl
               </span>
               <span className="text-[10px] text-rural-muted block mt-0.5">
-                {gradePricingMode === 'grades' ? 'Weighted across grades' : 'Grade B bulk rate (90%)'}
+                {gradePricingMode === 'grades' ? t('step1.weightedAvgPrice', 'Weighted across grades') : t('step1.bulkRate', 'Grade B bulk rate (90%)')}
               </span>
             </div>
 
             {/* Metric 3 */}
             <div className="p-3 rounded-xl bg-rural-cream border border-rural-border">
               <span className="text-[10px] font-bold uppercase text-rural-muted block">
-                3. Gross Selling Value
+                {t('step1.metric3Gross', '3. Gross Selling Value')}
               </span>
               <span className="font-bold text-rural-forest text-sm block mt-1">
                 {formatINR(breakdown.estimatedGrossSellingValue)}
               </span>
               <span className="text-[10px] text-rural-muted block mt-0.5">
-                For {breakdown.eligibleSellingQuantityQuintals.toFixed(1)} Qtl eligible produce
+                {breakdown.eligibleSellingQuantityQuintals.toFixed(1)} {t('common.quintal', 'Qtl')} {t('step1.eligibleHarvest', 'eligible')}
               </span>
             </div>
 
             {/* Metric 4 */}
             <div className="p-3 rounded-xl bg-rural-cream border border-rural-border">
               <span className="text-[10px] font-bold uppercase text-rural-muted block">
-                4. Transport Expenses
+                {t('step1.metric4Transport', '4. Transport Expenses')}
               </span>
               <span className="font-bold text-rose-700 text-sm block mt-1">
                 – {formatINR(breakdown.estimatedTransportationExpenses)}
               </span>
               <span className="text-[10px] text-rural-muted block mt-0.5">
-                Estimated road haulage
+                Road haulage
               </span>
             </div>
 
             {/* Metric 5 */}
             <div className="p-3 rounded-xl bg-rural-sage border border-rural-fresh/50 ring-1 ring-rural-fresh/40">
               <span className="text-[10px] font-bold uppercase text-rural-primary block">
-                5. Final Net Revenue
+                {t('step1.metric5Net', '5. Final Net Revenue')}
               </span>
               <span className="font-serif font-bold text-emerald-900 text-base sm:text-lg block mt-0.5">
                 {formatINR(breakdown.estimatedNetRevenue)}
               </span>
               <span className="text-[10px] text-emerald-800 font-medium block mt-0.5">
-                Take-home earnings
+                {t('step1.takeHomeEarnings', 'Take-home earnings')}
               </span>
             </div>
           </div>
         ) : (
           <div className="p-6 text-center text-xs text-rural-muted bg-rural-cream rounded-xl border border-rural-border">
-            Please adjust Grade A, B, and C percentages to total exactly 100% to calculate your final estimated net revenue.
+            {t('step1.gradeValidationAlert', 'Please adjust Grade A, B, and C percentages to total exactly 100% to calculate your final estimated net revenue.')}
           </div>
         )}
       </div>

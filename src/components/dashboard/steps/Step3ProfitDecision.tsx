@@ -7,11 +7,11 @@ import { FinancialWaterfallChart } from '../../charts/FinancialWaterfallChart';
 import { MarketRankingTable } from '../../markets/MarketRankingTable';
 import {
   Trophy,
-  ArrowRight,
   ArrowLeft,
   Printer,
   RotateCcw,
 } from 'lucide-react';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 interface Step3ProfitDecisionProps {
   bestMarket: MarketCalculationResult | null;
@@ -36,6 +36,8 @@ export const Step3ProfitDecision: React.FC<Step3ProfitDecisionProps> = ({
   onStartNewHarvest,
   onBack,
 }) => {
+  const { language, t } = useLanguage();
+
   return (
     <div className="space-y-8 animate-fade-in font-sans">
       {/* 1. Header Banner */}
@@ -48,16 +50,16 @@ export const Step3ProfitDecision: React.FC<Step3ProfitDecisionProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-rural-primary bg-rural-sage px-2.5 py-0.5 rounded-full border border-rural-border">
-                  Step 3 of 3
+                  {language === 'kn' ? 'ಹಂತ ೩ (೩ ರಲ್ಲಿ)' : language === 'hi' ? 'चरण ३ (३ में)' : 'Step 3 of 3'}
                 </span>
                 <span className="text-xs text-rural-muted">•</span>
-                <span className="text-xs font-semibold text-rural-forest">Profit Decision Hub</span>
+                <span className="text-xs font-semibold text-rural-forest">{t('common.step3Label')}</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-serif font-bold text-rural-forest mt-1">
-                Where Will You Actually Earn the Most Money?
+                {t('step3.title')}
               </h2>
               <p className="text-xs sm:text-sm text-rural-muted font-sans mt-0.5">
-                Our profit optimization engine accounts for transport costs, produce spoilage, and mandi fees to maximize your net take-home earnings.
+                {t('step3.subtitle')}
               </p>
             </div>
           </div>
@@ -69,7 +71,7 @@ export const Step3ProfitDecision: React.FC<Step3ProfitDecisionProps> = ({
               className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-rural-forest hover:bg-rural-deep text-white font-semibold text-xs transition-all shadow-sm hover:shadow cursor-pointer"
             >
               <Printer className="w-4 h-4 text-rural-fresh" />
-              <span>Print Official Report</span>
+              <span>{t('step3.generateReport')}</span>
             </button>
           </div>
         </div>
@@ -104,7 +106,13 @@ export const Step3ProfitDecision: React.FC<Step3ProfitDecisionProps> = ({
           className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-rural-cream hover:bg-rural-sage/60 text-rural-charcoal border border-rural-border font-semibold text-xs transition-colors cursor-pointer self-start sm:self-auto"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Step 2: Loss, Logistics & Market Discovery</span>
+          <span>
+            {language === 'kn'
+              ? 'ಹಿಂದೆ: ಹಂತ ೨ (ಸಾರಿಗೆ ಮತ್ತು ಮಾರುಕಟ್ಟೆಗಳು)'
+              : language === 'hi'
+              ? 'पीछे: चरण २ (परिवहन व मंडियां)'
+              : 'Back to Step 2: Loss, Logistics & Market Discovery'}
+          </span>
         </button>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
@@ -114,7 +122,7 @@ export const Step3ProfitDecision: React.FC<Step3ProfitDecisionProps> = ({
             className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-white hover:bg-rural-cream text-rural-forest border border-rural-border font-semibold text-xs transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5 text-rural-primary" />
-            <span>Start Another Harvest</span>
+            <span>{t('step3.startNewHarvest')}</span>
           </button>
 
           <button
@@ -123,11 +131,10 @@ export const Step3ProfitDecision: React.FC<Step3ProfitDecisionProps> = ({
             className="inline-flex items-center space-x-2 px-6 py-3 rounded-2xl bg-rural-forest hover:bg-rural-deep text-white font-semibold text-xs transition-all shadow-sm hover:shadow cursor-pointer"
           >
             <Printer className="w-4 h-4 text-rural-fresh" />
-            <span>View & Print Official Report</span>
+            <span>{t('step3.generateReport')}</span>
           </button>
         </div>
       </div>
     </div>
   );
 };
-

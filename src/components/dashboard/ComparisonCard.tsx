@@ -2,12 +2,14 @@ import React from 'react';
 import { ComparisonAnalysis } from '../../types/agriculture';
 import { formatINR, formatPercent } from '../../utils/currency';
 import { Sparkles, AlertCircle, CheckCircle2, TrendingUp, XCircle, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface ComparisonCardProps {
   comparison: ComparisonAnalysis | null;
 }
 
 export const ComparisonCard: React.FC<ComparisonCardProps> = ({ comparison }) => {
+  const { language, t } = useLanguage();
   if (!comparison) return null;
 
   const {
@@ -49,18 +51,21 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({ comparison }) =>
               <Sparkles className="w-4 h-4" />
             </span>
             <span className="text-xs font-semibold uppercase tracking-wider text-rural-primary">
-              Our Core Rule for Farmers
+              {language === 'kn' ? 'ರೈತರಿಗಾಗಿ ನಮ್ಮ ಮುಖ್ಯ ನಿಯಮ' : language === 'hi' ? 'किसानों के लिए हमारा मुख्य नियम' : 'Our Core Rule for Farmers'}
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-serif font-bold text-rural-forest mt-1">
-            The Highest Price Is Not Always the Best Deal
+            {t('step3.comparisonTitle')}
           </h2>
         </div>
 
         {!isSameMarket && (
           <div className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-rural-mint border border-rural-fresh/40 text-rural-forest text-xs font-bold self-start sm:self-auto shadow-sm">
             <TrendingUp className="w-4 h-4 text-rural-fresh" />
-            <span>Extra Money You Keep: +{formatINR(netReturnDifferenceTotal)}</span>
+            <span>
+              {language === 'kn' ? 'ಹೆಚ್ಚುವರಿ ಉಳಿಯುವ ಹಣ: +' : language === 'hi' ? 'अतिरिक्त बचने वाली रकम: +' : 'Extra Money You Keep: +'}
+              {formatINR(netReturnDifferenceTotal)}
+            </span>
           </div>
         )}
       </div>

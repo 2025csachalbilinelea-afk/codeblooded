@@ -16,13 +16,12 @@ import {
 } from '../../../engine/gradePricing';
 import {
   Sprout,
-  MapPin,
   ArrowRight,
   Info,
-  Calendar,
   ShieldCheck,
   Compass,
 } from 'lucide-react';
+import { useLanguage } from '../../../i18n/LanguageContext';
 
 interface Step1HarvestFarmProps {
   currentCrop: CropProfile;
@@ -51,6 +50,7 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
   quantityError,
   onNext,
 }) => {
+  const { language, t, getCropName } = useLanguage();
   const [localGradeError, setLocalGradeError] = useState<string | null>(null);
 
   // Convert volume to quintals
@@ -91,13 +91,22 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
     if (inputs.gradePricingMode === 'grades') {
       const validation = validateGradePercentages(inputs.gradeDistribution);
       if (!validation.isValid) {
-        setLocalGradeError(validation.message || 'Please ensure Grade A, B, and C total exactly 100%.');
+        setLocalGradeError(
+          validation.message ||
+            (language === 'kn'
+              ? 'ದಯವಿಟ್ಟು ಗ್ರೇಡ್ ಎ, ಬಿ ಮತ್ತು ಸಿ ಒಟ್ಟು 100% ಆಗಿರುವುದನ್ನು ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ.'
+              : language === 'hi'
+              ? 'कृपया सुनिश्चित करें कि ग्रेड ए, बी और सी का कुल योग ठीक 100% हो।'
+              : 'Please ensure Grade A, B, and C total exactly 100%.')
+        );
         return;
       }
     }
     setLocalGradeError(null);
     onNext();
   };
+
+  const localizedCropName = getCropName(currentCrop.id);
 
   return (
     <div className="space-y-8 animate-fade-in font-sans">
@@ -111,16 +120,16 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-rural-primary bg-rural-sage px-2.5 py-0.5 rounded-full border border-rural-border">
-                  Step 1 of 3
+                  {language === 'kn' ? 'ಹಂತ ೧ (೩ ರಲ್ಲಿ)' : language === 'hi' ? 'चरण १ (३ में)' : 'Step 1 of 3'}
                 </span>
                 <span className="text-xs text-rural-muted">•</span>
-                <span className="text-xs font-semibold text-rural-forest">Harvest & Farm Details</span>
+                <span className="text-xs font-semibold text-rural-forest">{t('common.step1Label')}</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-serif font-bold text-rural-forest mt-1">
-                Tell Us About Your Harvest & Farm Location
+                {t('step1.title')}
               </h2>
               <p className="text-xs sm:text-sm text-rural-muted font-sans mt-0.5">
-                Specify your crop, harvest quantity, quality grade distribution, and farm gate origin.
+                {t('step1.subtitle')}
               </p>
             </div>
           </div>
@@ -131,7 +140,7 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
               onClick={handleNextWithValidation}
               className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-rural-forest hover:bg-rural-deep text-white font-semibold text-xs transition-all shadow-sm hover:shadow cursor-pointer"
             >
-              <span>Next: Loss, Logistics & Markets</span>
+              <span>{t('step1.nextStepButton')}</span>
               <ArrowRight className="w-4 h-4 text-rural-fresh" />
             </button>
           </div>
@@ -145,7 +154,8 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
             1
           </div>
           <h3 className="font-serif font-bold text-lg text-rural-forest">
-            Select Your Crop
+            {t('step1.cropSectionTitle', 'Select Your Crop')}
+            {/* Select Your Crop */}
           </h3>
         </div>
 
@@ -165,28 +175,32 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
             <div className="bg-white rounded-3xl border border-rural-border p-5 sm:p-6 shadow-rural-soft space-y-3.5">
               <h4 className="font-serif font-bold text-base text-rural-forest flex items-center space-x-2">
                 <Info className="w-4 h-4 text-rural-primary" />
-                <span>Agronomic Spotlight</span>
+                <span>{t('step1.agronomicTitle', 'Agronomic Spotlight')}</span>
+                {/* Agronomic Spotlight */}
               </h4>
 
               <div className="space-y-3 text-xs">
                 <div className="p-3 rounded-2xl bg-rural-sage/60 border border-rural-border/80">
-                  <span className="text-[10px] uppercase font-bold text-rural-muted block">Selected Commodity</span>
-                  <span className="font-serif font-bold text-base text-rural-forest block mt-0.5">{currentCrop.name}</span>
-                  <span className="text-rural-muted block capitalize mt-0.5">Category: {currentCrop.category}</span>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-rural-cream border border-rural-border">
-                  <span className="text-[10px] uppercase font-bold text-rural-muted block">Typical Market Rate Range</span>
-                  <div className="text-sm font-bold text-emerald-800 mt-0.5">
-                    {formatINR(currentCrop.typicalMarketPriceRange.min)} – {formatINR(currentCrop.typicalMarketPriceRange.max)} / Qtl
-                  </div>
-                  <span className="text-[10px] text-rural-muted mt-0.5 block">
-                    Actual rates are queried live from AGMARKNET mandis.
+                  <span className="text-[10px] uppercase font-bold text-rural-muted block">{t('step1.selectedCommodity')}</span>
+                  <span className="font-serif font-bold text-base text-rural-forest block mt-0.5">{localizedCropName}</span>
+                  <span className="text-rural-muted block capitalize mt-0.5">
+                    {language === 'kn' ? 'ವರ್ಗ: ' : language === 'hi' ? 'श्रेणी: ' : 'Category: '}
+                    {currentCrop.category}
                   </span>
                 </div>
 
                 <div className="p-3 rounded-2xl bg-rural-cream border border-rural-border">
-                  <span className="text-[10px] uppercase font-bold text-rural-muted block">Perishability & Storage Notes</span>
+                  <span className="text-[10px] uppercase font-bold text-rural-muted block">{t('step1.typicalRateRange')}</span>
+                  <div className="text-sm font-bold text-emerald-800 mt-0.5">
+                    {formatINR(currentCrop.typicalMarketPriceRange.min)} – {formatINR(currentCrop.typicalMarketPriceRange.max)} / Qtl
+                  </div>
+                  <span className="text-[10px] text-rural-muted mt-0.5 block">
+                    {t('step1.typicalRateNote')}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-rural-cream border border-rural-border">
+                  <span className="text-[10px] uppercase font-bold text-rural-muted block">{t('step1.storagePerishabilityNotes')}</span>
                   <p className="text-rural-charcoal mt-1 text-[11px] leading-relaxed">
                     {currentCrop.storageNotes || currentCrop.description}
                   </p>
@@ -195,7 +209,7 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
                 <div className="p-3 rounded-2xl bg-rural-mint/30 border border-rural-fresh/30 text-rural-forest flex items-start space-x-2">
                   <ShieldCheck className="w-4 h-4 text-rural-primary shrink-0 mt-0.5" />
                   <span className="text-[11px] leading-relaxed">
-                    Transit spoilage is dynamically computed based on {currentCrop.name}'s perishability profile and transit duration.
+                    {t('step1.transitSpoilageModelNote')}
                   </span>
                 </div>
               </div>
@@ -211,7 +225,8 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
             2
           </div>
           <h3 className="font-serif font-bold text-lg text-rural-forest">
-            Enter Harvest Details
+            {t('step1.harvestSectionTitle', 'Enter Harvest Details')}
+            {/* Enter Harvest Details */}
           </h3>
         </div>
 
@@ -229,7 +244,7 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
             3
           </div>
           <h3 className="font-serif font-bold text-lg text-rural-forest">
-            Produce Quality & Grade Distribution
+            {t('step1.gradeSectionTitle')}
           </h3>
         </div>
 
@@ -257,7 +272,12 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
             4 & 5
           </div>
           <h3 className="font-serif font-bold text-lg text-rural-forest">
-            Set Your Farm Location & View on Regional Mandi Map
+            {language === 'kn'
+              ? 'ನಿಮ್ಮ ಜಮೀನಿನ ಸ್ಥಳ ಮತ್ತು ಪ್ರಾದೇಶಿಕ ಮಂಡಿ ನಕ್ಷೆ'
+              : language === 'hi'
+              ? 'अपने खेत का स्थान और क्षेत्रीय मंडी मानचित्र'
+              : 'Set Your Farm Location & View on Regional Mandi Map'}
+            {/* Set Your Farm Location & Regional Mandi Map */}
           </h3>
         </div>
 
@@ -273,17 +293,20 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
             <div className="bg-white rounded-3xl border border-rural-border p-5 sm:p-6 shadow-rural-soft space-y-3">
               <div className="flex items-center space-x-2 text-rural-forest font-serif font-bold text-sm">
                 <ShieldCheck className="w-4 h-4 text-rural-primary" />
-                <span>Verified Farm Origin Coordinates</span>
+                <span>{t('step1.verifiedCoordinates', 'Verified Farm Origin Coordinates')}</span>
+                {/* Verified Farm Origin Coordinates */}
               </div>
               <div className="space-y-2 text-xs font-sans text-rural-charcoal">
                 <div className="p-3 rounded-2xl bg-rural-cream border border-rural-border flex justify-between items-center">
-                  <span className="text-rural-muted">Origin Address:</span>
+                  <span className="text-rural-muted">{t('step1.originAddress')}</span>
                   <span className="font-semibold text-rural-forest text-right truncate max-w-[60%]">
                     {farmerLocation.formattedAddress}
                   </span>
                 </div>
                 <div className="p-3 rounded-2xl bg-rural-cream border border-rural-border flex justify-between items-center">
-                  <span className="text-rural-muted">GPS Coordinates:</span>
+                  <span className="text-rural-muted">
+                    {language === 'kn' ? 'ಜಿಪಿಎಸ್ ನಿರ್ದೇಶಾಂಕಗಳು:' : language === 'hi' ? 'जीपीएस निर्देशांक:' : 'GPS Coordinates:'}
+                  </span>
                   <span className="font-mono text-rural-forest font-medium">
                     {farmerLocation.latitude.toFixed(4)}° N, {farmerLocation.longitude.toFixed(4)}° E
                   </span>
@@ -291,7 +314,7 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
                 <div className="p-3 rounded-2xl bg-rural-sage/60 border border-rural-border text-rural-forest flex items-start space-x-2">
                   <Compass className="w-4 h-4 text-rural-primary shrink-0 mt-0.5" />
                   <span className="text-[11px] leading-relaxed">
-                    Turn-by-turn road driving distance to each APMC mandi is calculated from this exact farm gate location.
+                    {t('step1.roadMileageNote')}
                   </span>
                 </div>
               </div>
@@ -304,20 +327,20 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-rural-border/70 gap-2 mb-4">
                 <div>
                   <h4 className="font-serif font-bold text-base text-rural-forest">
-                    Regional APMC Mandi Network Map
+                    {t('step1.mapTitle')}
                   </h4>
                   <p className="text-xs text-rural-muted font-sans mt-0.5">
-                    Click any mandi pin on the map to inspect road corridors and distances.
+                    {t('step1.mapSubtitle')}
                   </p>
                 </div>
                 <div className="flex items-center space-x-2 text-xs font-medium">
                   <span className="inline-flex items-center space-x-1 text-rural-forest bg-rural-mint px-2 py-0.5 rounded-full border border-rural-fresh/30">
                     <span className="w-2 h-2 rounded-full bg-rural-fresh" />
-                    <span>Farm Gate</span>
+                    <span>{t('step1.farmGatePin')}</span>
                   </span>
                   <span className="inline-flex items-center space-x-1 text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
                     <span className="w-2 h-2 rounded-full bg-amber-600" />
-                    <span>APMC Mandi</span>
+                    <span>{t('step1.apmcMandiPin')}</span>
                   </span>
                 </div>
               </div>
@@ -340,7 +363,7 @@ export const Step1HarvestFarm: React.FC<Step1HarvestFarmProps> = ({
           onClick={handleNextWithValidation}
           className="inline-flex items-center space-x-2 px-7 py-3 rounded-2xl bg-rural-forest hover:bg-rural-deep text-white font-semibold text-xs sm:text-sm transition-all shadow-sm hover:shadow cursor-pointer"
         >
-          <span>Continue to Step 2: Loss, Logistics & Market Discovery</span>
+          <span>{t('step1.nextStepButton')}</span>
           <ArrowRight className="w-4 h-4 text-rural-fresh" />
         </button>
       </div>

@@ -494,15 +494,6 @@ export const App: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setIsVerificationModalOpen(true)}
-              className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-medium bg-white text-rural-forest border border-rural-border hover:bg-rural-sage/60 transition-colors shadow-rural-soft cursor-pointer"
-            >
-              <ShieldCheck className="w-4 h-4 text-rural-primary" />
-              <span>Calculator Ready</span>
-            </button>
-
-            <button
-              type="button"
               onClick={handlePrint}
               className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rural-fresh text-white hover:bg-rural-fresh/90 shadow-sm transition-all cursor-pointer"
             >

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sprout, Truck, Trophy, Check } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export type DashboardStep = 1 | 2 | 3;
 
@@ -15,6 +16,8 @@ export const DASHBOARD_STEPS = [
     stepNumber: '01',
     label: 'Harvest & Farm Details',
     subtext: 'Crop, Volume & Location',
+    titleKey: 'stepNav.step1Title',
+    subtextKey: 'stepNav.step1Subtitle',
     icon: Sprout,
   },
   {
@@ -22,6 +25,8 @@ export const DASHBOARD_STEPS = [
     stepNumber: '02',
     label: 'Loss, Logistics & Market Discovery',
     subtext: 'Transit, Fuel & Live Mandis',
+    titleKey: 'stepNav.step2Title',
+    subtextKey: 'stepNav.step2Subtitle',
     icon: Truck,
   },
   {
@@ -29,6 +34,8 @@ export const DASHBOARD_STEPS = [
     stepNumber: '03',
     label: 'Profit Decision',
     subtext: 'Net Take-Home & Recommendation',
+    titleKey: 'stepNav.step3Title',
+    subtextKey: 'stepNav.step3Subtitle',
     icon: Trophy,
   },
 ];
@@ -38,6 +45,8 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
   onStepChange,
   completedSteps = [],
 }) => {
+  const { t } = useLanguage();
+
   return (
     <div className="bg-white/95 backdrop-blur-md border border-rural-border rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-rural-soft mb-8 no-print font-sans">
       {/* Desktop Stepper with Connecting Progress Lines */}
@@ -46,6 +55,8 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
           const isActive = currentStep === step.id;
           const isCompleted = completedSteps.includes(step.id) && !isActive;
           const StepIcon = step.icon;
+          const stepLabel = t(step.titleKey, step.label);
+          const stepSubtext = t(step.subtextKey, step.subtext);
 
           return (
             <div key={step.id} className="relative flex items-center">
@@ -63,60 +74,58 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
               <button
                 type="button"
                 onClick={() => onStepChange(step.id)}
-                className={`w-full group flex items-center space-x-3.5 p-3.5 sm:p-4 rounded-2xl text-left transition-all cursor-pointer relative overflow-hidden border ${
+                className={`w-full p-3 sm:p-3.5 rounded-2xl border text-left transition-all flex items-center space-x-3 cursor-pointer group ${
                   isActive
-                    ? 'bg-rural-forest text-white shadow-rural-soft border-rural-deep ring-2 ring-rural-fresh/40'
+                    ? 'border-rural-fresh bg-rural-sage/80 shadow-sm ring-2 ring-rural-fresh/40'
                     : isCompleted
-                    ? 'bg-rural-sage/60 hover:bg-rural-sage text-rural-forest border-rural-border/80'
-                    : 'hover:bg-rural-cream/80 text-rural-charcoal border-rural-border/50 bg-white/50'
+                    ? 'border-rural-border/80 bg-white hover:bg-rural-cream/60'
+                    : 'border-rural-border/50 bg-stone-50/70 hover:bg-white text-stone-500'
                 }`}
               >
-                {/* Numbered & Icon Step Indicator Bubble */}
+                {/* Step indicator circle */}
                 <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold transition-all shadow-sm ${
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 transition-all ${
                     isActive
-                      ? 'bg-rural-fresh text-white ring-2 ring-white/20'
+                      ? 'bg-rural-forest text-white shadow-sm ring-2 ring-rural-fresh'
                       : isCompleted
-                      ? 'bg-rural-mint text-rural-forest font-bold'
-                      : 'bg-rural-cream border border-rural-border text-rural-muted group-hover:text-rural-forest'
+                      ? 'bg-rural-mint text-rural-primary'
+                      : 'bg-stone-200/70 text-stone-600 group-hover:bg-stone-200'
                   }`}
                 >
                   {isCompleted ? (
-                    <Check className="w-5 h-5 stroke-[2.5]" />
+                    <Check className="w-5 h-5 text-rural-primary stroke-[2.5]" />
                   ) : (
-                    <StepIcon className="w-5 h-5 stroke-[2]" />
+                    <span>{step.stepNumber}</span>
                   )}
                 </div>
 
-                {/* Step Labels */}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5">
                     <span
-                      className={`text-[10px] uppercase font-bold tracking-wider block ${
-                        isActive ? 'text-rural-mint' : isCompleted ? 'text-rural-primary' : 'text-rural-muted'
+                      className={`text-[10px] font-bold uppercase tracking-wider ${
+                        isActive
+                          ? 'text-rural-primary'
+                          : isCompleted
+                          ? 'text-rural-forest font-semibold'
+                          : 'text-stone-400'
                       }`}
                     >
-                      STEP {step.id} OF 3
+                      Step {step.id}
                     </span>
-                    {isCompleted && (
-                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded">
-                        Done
-                      </span>
-                    )}
                   </div>
                   <div
-                    className={`text-sm font-serif font-bold truncate mt-0.5 ${
-                      isActive ? 'text-white' : 'text-rural-forest'
+                    className={`font-serif font-bold text-xs sm:text-sm truncate leading-snug ${
+                      isActive
+                        ? 'text-rural-forest'
+                        : isCompleted
+                        ? 'text-stone-800'
+                        : 'text-stone-600'
                     }`}
                   >
-                    {step.label}
+                    {stepLabel}
                   </div>
-                  <div
-                    className={`text-[11px] truncate mt-0.5 ${
-                      isActive ? 'text-white/80' : 'text-rural-muted'
-                    }`}
-                  >
-                    {step.subtext}
+                  <div className="text-[10px] text-rural-muted truncate mt-0.5">
+                    {stepSubtext}
                   </div>
                 </div>
               </button>
@@ -125,41 +134,33 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
         })}
       </div>
 
-      {/* Mobile Stepper (Clean 3-step flex layout) */}
-      <div className="md:hidden grid grid-cols-3 gap-1.5">
+      {/* Mobile Stepper: Sleek 3-button compact tab strip */}
+      <div className="grid md:hidden grid-cols-3 gap-1.5">
         {DASHBOARD_STEPS.map((step) => {
           const isActive = currentStep === step.id;
           const isCompleted = completedSteps.includes(step.id) && !isActive;
+          const StepIcon = step.icon;
+          const stepLabel = t(step.titleKey, step.label);
 
           return (
             <button
               key={step.id}
               type="button"
               onClick={() => onStepChange(step.id)}
-              className={`flex flex-col items-center text-center p-2 rounded-xl transition-all cursor-pointer ${
+              className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center cursor-pointer ${
                 isActive
-                  ? 'bg-rural-forest text-white shadow-sm'
+                  ? 'border-rural-fresh bg-rural-sage ring-1 ring-rural-fresh text-rural-forest'
                   : isCompleted
-                  ? 'bg-rural-sage text-rural-forest border border-rural-border'
-                  : 'bg-rural-cream text-rural-muted'
+                  ? 'border-rural-border bg-white text-rural-primary'
+                  : 'border-transparent bg-stone-100 text-stone-500'
               }`}
             >
-              <div
-                className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold mb-1 ${
-                  isActive
-                    ? 'bg-rural-fresh text-white'
-                    : isCompleted
-                    ? 'bg-rural-mint text-rural-forest'
-                    : 'bg-white border border-rural-border text-rural-muted'
-                }`}
-              >
-                {isCompleted ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : step.id}
+              <div className="flex items-center space-x-1 mb-0.5">
+                <StepIcon className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-bold">{step.stepNumber}</span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider block truncate w-full">
-                Step {step.id}
-              </span>
-              <span className="text-[11px] font-serif font-semibold truncate w-full mt-0.5">
-                {step.id === 1 ? 'Harvest' : step.id === 2 ? 'Logistics' : 'Profit'}
+              <span className="text-[10px] font-semibold truncate max-w-full">
+                {stepLabel}
               </span>
             </button>
           );

@@ -25,6 +25,7 @@ import {
   BulkBuyerRequirement,
   SAMPLE_BUYER_REQUIREMENTS,
 } from '../../data/sampleMarketplaceRequirements';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const STORAGE_KEY = 'harvestroute_bulk_buyer_requirements_v1';
 
@@ -40,6 +41,7 @@ export const BulkBuyerMarketplace: React.FC<BulkBuyerMarketplaceProps> = ({
   currentCrop,
   onGoToDashboard,
 }) => {
+  const { language, t, getCropName } = useLanguage();
   const [activeTab, setActiveTab] = useState<'farmer' | 'buyer'>('farmer');
   const [requirements, setRequirements] = useState<BulkBuyerRequirement[]>(() => {
     if (typeof window !== 'undefined') {
@@ -167,15 +169,21 @@ export const BulkBuyerMarketplace: React.FC<BulkBuyerMarketplaceProps> = ({
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center space-x-2 bg-rural-mint/20 border border-rural-mint/40 text-rural-mint px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider mb-3 backdrop-blur-sm">
             <Building2 className="w-3.5 h-3.5 text-rural-fresh" />
-            <span>B2B Institutional Sourcing Marketplace</span>
+            <span>
+              {language === 'kn'
+                ? 'ಬಿ೨ಬಿ ಸಾಂಸ್ಥಿಕ ಸೋರ್ಸಿಂಗ್ ಮಾರುಕಟ್ಟೆ'
+                : language === 'hi'
+                ? 'बी2बी संस्थागत खरीद बाज़ार'
+                : 'B2B Institutional Sourcing Marketplace'}
+            </span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight leading-tight">
-            Bulk Buyer Marketplace
+            {t('marketplace.title')}
           </h1>
 
           <p className="text-sm sm:text-base text-rural-mint/90 font-light mt-2 leading-relaxed">
-            Connecting verified hotels, catering companies, commercial kitchens, and wholesale buyers directly with farm-gate producers.
+            {t('marketplace.subtitle')}
           </p>
 
           {/* Differentiated Tab Switcher */}
@@ -190,7 +198,13 @@ export const BulkBuyerMarketplace: React.FC<BulkBuyerMarketplaceProps> = ({
               }`}
             >
               <Store className="w-4 h-4" />
-              <span>Farmer View: Find Buyers for Your Harvest</span>
+              <span>
+                {language === 'kn'
+                  ? 'ರೈತರ ನೋಟ: ನಿಮ್ಮ ಕಟಾವಿಗೆ ಖರೀದಿದಾರರನ್ನು ಹುಡುಕಿ'
+                  : language === 'hi'
+                  ? 'किसान दृश्य: अपनी फसल के लिए खरीदार खोजें'
+                  : 'Farmer View: Find Buyers for Your Harvest'}
+              </span>
             </button>
 
             <button
@@ -203,7 +217,13 @@ export const BulkBuyerMarketplace: React.FC<BulkBuyerMarketplaceProps> = ({
               }`}
             >
               <PlusCircle className="w-4 h-4" />
-              <span>Buyer View: Post Produce Requirement</span>
+              <span>
+                {language === 'kn'
+                  ? 'ಖರೀದಿದಾರರ ನೋಟ: ಹೊಸ ಖರೀದಿಯ ಅಗತ್ಯವನ್ನು ಪೋಸ್ಟ್ ಮಾಡಿ'
+                  : language === 'hi'
+                  ? 'खरीदार दृश्य: फसल आवश्यकता पोस्ट करें'
+                  : 'Buyer View: Post Produce Requirement'}
+              </span>
             </button>
           </div>
         </div>
@@ -216,17 +236,19 @@ export const BulkBuyerMarketplace: React.FC<BulkBuyerMarketplaceProps> = ({
           <div className="bg-white rounded-2xl border border-rural-border p-4 shadow-rural-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center space-x-3">
               <span className="text-xs font-semibold text-rural-forest uppercase tracking-wider">
-                Filter by Crop:
+                {language === 'kn' ? 'ಬೆಳೆಯ ಪ್ರಕಾರ ಫಿಲ್ಟರ್:' : language === 'hi' ? 'फसल अनुसार फ़िल्टर:' : 'Filter by Crop:'}
               </span>
               <select
                 value={filterCommodity}
                 onChange={(e) => setFilterCommodity(e.target.value)}
                 className="text-xs bg-rural-cream border border-rural-border rounded-xl px-3 py-1.5 font-medium text-rural-charcoal focus:outline-none focus:ring-2 focus:ring-rural-fresh"
               >
-                <option value="all">All Commodities ({totalFilteredCount})</option>
+                <option value="all">
+                  {t('marketplace.allCrops')} ({totalFilteredCount})
+                </option>
                 {CROP_PROFILES.map((c) => (
                   <option key={c.id} value={c.name}>
-                    {c.name}
+                    {getCropName(c.id)}
                   </option>
                 ))}
               </select>

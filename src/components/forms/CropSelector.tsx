@@ -2,7 +2,8 @@ import React from 'react';
 import { CropProfile } from '../../types/agriculture';
 import { CORE_CROPS } from '../../data/crops';
 import { resolveCropMarketReferencePrice } from '../../engine/gradePricing';
-import { Sprout, Info, TrendingUp, ShieldCheck } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
+import { Sprout, Info, TrendingUp } from 'lucide-react';
 import { formatINR } from '../../utils/currency';
 
 interface CropSelectorProps {
@@ -18,6 +19,8 @@ export const CropSelector: React.FC<CropSelectorProps> = ({
   referencePrice,
   isCached,
 }) => {
+  const { t, getCropName } = useLanguage();
+
   const handleCropChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const found = CORE_CROPS.find((c) => c.id === e.target.value);
     if (found) {
@@ -60,6 +63,7 @@ export const CropSelector: React.FC<CropSelectorProps> = ({
   };
 
   const badgeInfo = getPerishabilityBadge(selectedCrop.perishabilityClass);
+  const localizedSelectedCropName = getCropName(selectedCrop.id, selectedCrop.name);
 
   return (
     <div className="bg-white rounded-3xl border border-rural-border shadow-rural-soft p-5 sm:p-6 space-y-4">
@@ -71,10 +75,10 @@ export const CropSelector: React.FC<CropSelectorProps> = ({
           </div>
           <div>
             <h2 className="text-base font-serif font-bold text-rural-forest">
-              1. Select Your Crop
+              {t('step1.selectCropTitle', '1. Select Your Crop')}
             </h2>
             <p className="text-xs text-rural-muted">
-              Choose from the 10 supported national agricultural commodities
+              {t('step1.selectCropSubtitle', 'Choose from the 10 supported national agricultural commodities')}
             </p>
           </div>
         </div>
@@ -92,7 +96,7 @@ export const CropSelector: React.FC<CropSelectorProps> = ({
             htmlFor="crop-select"
             className="block text-xs font-semibold text-rural-charcoal mb-1.5"
           >
-            Select Your Crop
+            {t('step1.selectCropLabel', 'Select Your Crop')}
           </label>
           <select
             id="crop-select"
@@ -102,9 +106,10 @@ export const CropSelector: React.FC<CropSelectorProps> = ({
           >
             {CORE_CROPS.map((crop) => {
               const cropPrice = resolveCropMarketReferencePrice(crop);
+              const localizedName = getCropName(crop.id, crop.name);
               return (
                 <option key={crop.id} value={crop.id}>
-                  {crop.name} — Current Reference: ₹{cropPrice.price.toLocaleString('en-IN')}/Qtl (Typical ₹{crop.typicalMarketPriceRange.min.toLocaleString('en-IN')} – ₹{crop.typicalMarketPriceRange.max.toLocaleString('en-IN')})
+                  {localizedName} — {t('step1.marketRefLabel', 'Current Reference')}: ₹{cropPrice.price.toLocaleString('en-IN')}{t('common.perQuintal', '/Qtl')} (Typical ₹{crop.typicalMarketPriceRange.min.toLocaleString('en-IN')} – ₹{crop.typicalMarketPriceRange.max.toLocaleString('en-IN')})
                 </option>
               );
             })}
@@ -119,7 +124,7 @@ export const CropSelector: React.FC<CropSelectorProps> = ({
             </div>
             <div>
               <span className="text-[11px] font-semibold text-rural-forest block">
-                Current Market Reference Price for {selectedCrop.name}
+                {t('step1.marketRefLabel', 'Current Market Reference Price for')} {localizedSelectedCropName}
               </span>
               <span className="text-[10px] text-rural-muted">
                 {currentPriceInfo.source}
@@ -130,7 +135,7 @@ export const CropSelector: React.FC<CropSelectorProps> = ({
 
           <div className="flex items-center space-x-2 self-start sm:self-auto">
             <span className="text-base font-bold text-emerald-900 font-serif">
-              {formatINR(displayPrice)} / Qtl
+              {formatINR(displayPrice)} {t('common.perQuintal', '/ Qtl')}
             </span>
             <span
               className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -139,7 +144,7 @@ export const CropSelector: React.FC<CropSelectorProps> = ({
                   : 'bg-emerald-50 text-emerald-800 border-emerald-300'
               }`}
             >
-              {displayCached ? 'CACHED APMC' : 'LIVE AGMARKNET'}
+              {displayCached ? t('common.cached', 'CACHED APMC') : t('common.live', 'LIVE AGMARKNET')}
             </span>
           </div>
         </div>
@@ -150,10 +155,10 @@ export const CropSelector: React.FC<CropSelectorProps> = ({
         <Info className="w-4 h-4 text-rural-primary shrink-0 mt-0.5" />
         <div>
           <p className="font-medium text-rural-forest">
-            {selectedCrop.name}: {selectedCrop.description}
+            {localizedSelectedCropName}: {selectedCrop.description}
           </p>
           <p className="text-[11px] text-rural-muted mt-0.5">
-            {badgeInfo.desc} Storage: {selectedCrop.storageNotes}
+            {badgeInfo.desc} {selectedCrop.storageNotes ? `Storage: ${selectedCrop.storageNotes}` : ''}
           </p>
         </div>
       </div>

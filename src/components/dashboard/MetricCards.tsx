@@ -2,6 +2,7 @@ import React from 'react';
 import { MarketCalculationResult } from '../../types/agriculture';
 import { formatINR, formatPercent } from '../../utils/currency';
 import { Trophy, TrendingUp, PackageCheck, AlertCircle, Fuel, Building2, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface MetricCardsProps {
   bestMarket: MarketCalculationResult | null;
@@ -9,6 +10,7 @@ interface MetricCardsProps {
 }
 
 export const MetricCards: React.FC<MetricCardsProps> = ({ bestMarket, totalHarvestQuintals }) => {
+  const { language, t } = useLanguage();
   if (!bestMarket) {
     return (
       <div className="bg-rose-50 border border-rose-300 rounded-3xl p-6 sm:p-8 text-center shadow-rural-soft">
@@ -37,7 +39,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ bestMarket, totalHarve
           <div>
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rural-fresh/20 border border-rural-fresh/40 text-rural-mint text-xs font-semibold uppercase tracking-wider mb-2">
               <Trophy className="w-3.5 h-3.5 text-rural-fresh" />
-              <span>Our Recommended Market</span>
+              <span>{t('step3.heroRecommendedMandi')}</span>
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-white tracking-tight">
               {bestMarket.market.name}
@@ -55,13 +57,13 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ bestMarket, totalHarve
           {/* Large In-Pocket Earnings Display */}
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/15 min-w-[260px] text-left lg:text-right">
             <span className="text-xs uppercase font-semibold text-rural-mint/90 tracking-wider block">
-              Estimated Money You Keep
+              {t('step3.heroNetEarnings')}
             </span>
             <div className="text-3xl sm:text-4xl font-sans font-black text-white mt-0.5 tracking-tight">
               {formatINR(bestMarket.netReturn)}
             </div>
             <div className="text-xs sm:text-sm text-rural-mint font-medium mt-1">
-              Estimated earnings per quintal:{' '}
+              {language === 'kn' ? 'ಕ್ವಿಂಟಾಲಿಗೆ ಅಂದಾಜು ಗಳಿಕೆ:' : language === 'hi' ? 'प्रति क्विंटल अनुमानित कमाई:' : 'Estimated earnings per quintal:'}{' '}
               <strong className="text-white font-bold">
                 {formatINR(bestMarket.netReturnPerQuintal)} / Qtl
               </strong>
@@ -116,21 +118,23 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ bestMarket, totalHarve
         {/* Card A: Expected Sales */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-rural-border shadow-rural-soft">
           <div className="flex items-center justify-between text-xs text-rural-muted mb-1.5 font-medium">
-            <span className="uppercase tracking-wider">Expected Sales</span>
+            <span className="uppercase tracking-wider">{t('step3.heroGrossSales')}</span>
             <TrendingUp className="w-4 h-4 text-rural-primary" />
           </div>
           <div className="text-2xl font-bold text-rural-forest font-sans">
             {formatINR(bestMarket.grossRevenue)}
           </div>
           <p className="text-xs text-rural-muted mt-1">
-            Sold at {formatINR(Math.round(bestMarket.grossRevenue / Math.max(0.1, bestMarket.saleableQuantityQuintals)))} / Qtl effective rate
+            {language === 'kn' ? 'ದರ: ' : language === 'hi' ? 'भाव: ' : 'Sold at '}{formatINR(Math.round(bestMarket.grossRevenue / Math.max(0.1, bestMarket.saleableQuantityQuintals)))} / Qtl
           </p>
         </div>
 
         {/* Card B: Produce Available to Sell */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-rural-border shadow-rural-soft">
           <div className="flex items-center justify-between text-xs text-rural-muted mb-1.5 font-medium">
-            <span className="uppercase tracking-wider">Available to Sell</span>
+            <span className="uppercase tracking-wider">
+              {language === 'kn' ? 'ಮಾರಾಟಕ್ಕೆ ಲಭ್ಯವಿರುವ ಪ್ರಮಾಣ' : language === 'hi' ? 'बिक्री योग्य मात्रा' : 'Available to Sell'}
+            </span>
             <PackageCheck className="w-4 h-4 text-rural-primary" />
           </div>
           <div className="text-2xl font-bold text-rural-forest font-sans">
@@ -138,21 +142,23 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ bestMarket, totalHarve
             <span className="text-sm font-semibold text-rural-muted">Qtl</span>
           </div>
           <p className="text-xs text-amber-800 font-medium mt-1">
-            Crop lost on way: {bestMarket.physicalLossQuintals.toFixed(1)} Qtl ({formatPercent(bestMarket.estimatedLossPercent)})
+            {language === 'kn' ? 'ಸಾಗಾಣಿಕೆ ನಷ್ಟ: ' : language === 'hi' ? 'परिवहन नुकसान: ' : 'Crop lost on way: '}{bestMarket.physicalLossQuintals.toFixed(1)} Qtl ({formatPercent(bestMarket.estimatedLossPercent)})
           </p>
         </div>
 
         {/* Card C: Transport & Market Fees */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-rural-border shadow-rural-soft">
           <div className="flex items-center justify-between text-xs text-rural-muted mb-1.5 font-medium">
-            <span className="uppercase tracking-wider">Transport & Market Fees</span>
+            <span className="uppercase tracking-wider">
+              {language === 'kn' ? 'ಸಾರಿಗೆ ಮತ್ತು ಮಂಡಿ ಶುಲ್ಕಗಳು' : language === 'hi' ? 'परिवहन व मंडी शुल्क' : 'Transport & Market Fees'}
+            </span>
             <Fuel className="w-4 h-4 text-amber-700" />
           </div>
           <div className="text-2xl font-bold text-rural-forest font-sans">
             {formatINR(bestMarket.totalExpenses)}
           </div>
           <p className="text-xs text-rural-muted mt-1">
-            Transport: {formatINR(bestMarket.transportationCost)} • Fees: {formatINR(bestMarket.totalMarketFees)}
+            {language === 'kn' ? 'ಸಾರಿಗೆ: ' : language === 'hi' ? 'परिवहन: ' : 'Transport: '}{formatINR(bestMarket.transportationCost)} • {language === 'kn' ? 'ಶುಲ್ಕ: ' : language === 'hi' ? 'शुल्क: ' : 'Fees: '}{formatINR(bestMarket.totalMarketFees)}
           </p>
         </div>
       </div>
