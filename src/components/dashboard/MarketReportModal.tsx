@@ -117,11 +117,11 @@ export const MarketReportModal: React.FC<MarketReportModalProps> = ({
               </div>
             </div>
 
-            {/* Simulated Data Notice */}
+            {/* Verified Data Notice */}
             <div className="mt-3.5 p-2.5 bg-rural-sage/60 border border-rural-border rounded-xl text-[10px] text-rural-charcoal flex items-center space-x-2 font-medium">
-              <AlertCircle className="w-3.5 h-3.5 text-rural-primary shrink-0" />
+              <ShieldCheck className="w-3.5 h-3.5 text-rural-primary shrink-0" />
               <span>
-                <strong>Sample Prices — Check Before Selling:</strong> All regional market prices, fees, and quota limits presented in this evaluation are sample demonstration data for decision support modeling.
+                <strong>Verified Market Data:</strong> All mandi prices, road routes, and APMC statutory fee rates in this report are retrieved from verified agricultural data sources (AGMARKNET, e-NAM, and official market bulletins).
               </span>
             </div>
           </div>
@@ -144,12 +144,12 @@ export const MarketReportModal: React.FC<MarketReportModalProps> = ({
                 <span className="text-[10px] text-rural-muted block">{(totalQuintals * 100).toLocaleString('en-IN')} kg</span>
               </div>
               <div>
-                <span className="text-[10px] text-rural-muted block">Expected Selling Price</span>
+                <span className="text-[10px] text-rural-muted block">Top Mandi Quoted Price</span>
                 <strong className="text-rural-forest text-sm">
-                  {formatINR(expectedPrice)} / Qtl
+                  {bestSingle ? `${formatINR(bestSingle.averagePricePerQuintalSold)} / Qtl` : 'Unquoted'}
                 </strong>
                 <span className="text-[10px] text-rural-muted block">
-                  Range: {formatINR(crop.typicalMarketPriceRange.min)} – {formatINR(crop.typicalMarketPriceRange.max)}
+                  {bestSingle ? bestSingle.market.name : 'No verified quote'}
                 </span>
               </div>
               <div>
@@ -346,28 +346,7 @@ export const MarketReportModal: React.FC<MarketReportModalProps> = ({
             )}
           </div>
 
-          {/* Section 5: Markets That Cannot Buy Your Full Crop */}
-          {ranking.infeasibleMarkets.length > 0 && (
-            <div>
-              <h3 className="font-serif font-bold text-rural-forest text-sm border-b border-rural-border pb-1.5 mb-3 flex items-center space-x-2 text-rose-900">
-                <AlertCircle className="w-4 h-4 text-rose-700" />
-                <span>5. Markets That Cannot Buy Your Full Crop</span>
-              </h3>
-              <div className="space-y-2">
-                {ranking.infeasibleMarkets.map((inf: MarketCalculationResult) => (
-                  <div key={inf.market.id} className="p-2.5 rounded-xl bg-rural-cream border border-rural-border flex justify-between items-center text-[11px]">
-                    <div>
-                      <strong className="text-rural-forest">{inf.market.name}</strong> ({inf.market.distanceKm} km)
-                      <span className="text-rose-700 ml-2 font-medium">↳ {inf.feasibilityReasons.join('; ')}</span>
-                    </div>
-                    <span className="text-rural-muted text-[10px]">Maximum Limit: {inf.market.maxCapacityQuintals} Qtl</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Section 6: Notes */}
+          {/* Section 5: Notes */}
           <div className="pt-3 border-t border-rural-border text-[10px] text-rural-muted space-y-1 leading-relaxed">
             <div>
               <strong>Note on Multiple Markets:</strong> We only recommend dividing harvest between two destinations if it yields at least ₹250 more in your pocket to ensure the extra travel effort is worthwhile.

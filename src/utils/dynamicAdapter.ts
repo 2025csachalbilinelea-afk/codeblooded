@@ -34,7 +34,7 @@ export function convertDynamicToMarketCalculationResult(
       }${evalItem.priceRecord?.arrivalDate ? ` (Arrival: ${evalItem.priceRecord.arrivalDate})` : ''}${
         evalItem.priceRecord?.sourceUrl ? ` • URL: ${evalItem.priceRecord.sourceUrl}` : ''
       } • Status: ${evalItem.internalPriceStatus || 'VERIFIED QUOTE'}`,
-      simulatedFlag: true,
+      simulatedFlag: false,
     },
     initialQuantityQuintals: evalItem.consignmentQuintals,
     gradeQuantities: {

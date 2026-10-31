@@ -3,6 +3,7 @@ import {
   FarmerInputs,
   CropProfile,
   MarketCalculationResult,
+  SplitHarvestResult,
 } from './types/agriculture';
 import {
   FarmerLocation,
@@ -11,8 +12,7 @@ import {
   DynamicMandiEvaluation,
 } from './types/marketDiscovery';
 import { getCropById } from './data/crops';
-import { getSimulatedMarketsForCrop } from './data/markets';
-import { rankMarketsByNetReturn } from './engine/ranking';
+import { MarketRankingResult } from './engine/ranking';
 import { analyzeHighestPriceVsNetReturn } from './engine/recommendations';
 import { optimizeSplitHarvest } from './engine/splitHarvest';
 import { convertToQuintals } from './engine/units';
@@ -33,10 +33,8 @@ import { TransportConfigForm } from './components/forms/TransportConfig';
 import { MetricCards } from './components/dashboard/MetricCards';
 import { ComparisonCard } from './components/dashboard/ComparisonCard';
 import { DynamicMarketSection } from './components/dashboard/DynamicMarketSection';
-import { CropPriceForecastSection } from './components/dashboard/CropPriceForecastSection';
 import { MarketRankingTable } from './components/markets/MarketRankingTable';
 import { SplitHarvestSection } from './components/dashboard/SplitHarvestSection';
-import { InfeasibleMarketsSection } from './components/markets/InfeasibleMarketsSection';
 import { FinancialBreakdownModal } from './components/dashboard/FinancialBreakdownModal';
 import { SplitHarvestModal } from './components/dashboard/SplitHarvestModal';
 import { FinancialWaterfallChart } from './components/charts/FinancialWaterfallChart';
@@ -59,7 +57,6 @@ const INITIAL_INPUTS: FarmerInputs = {
   harvestDate: new Date().toISOString().split('T')[0],
   maturity: 'optimal',
   originLocation: INITIAL_LOCATION.formattedAddress,
-  expectedPricePerQuintal: 2400,
   gradeDistribution: { A: 50, B: 35, C: 15 },
   spoilage: {
     mode: 'automatic',
@@ -135,7 +132,6 @@ export const App: React.FC = () => {
   // Phase 5 Discovery State
   const [sortOption, setSortOption] = useState<MandiSortOption>('netRevenue');
   const [filters, setFilters] = useState<MandiFilterOptions>({});
-  const [isLiveMode, setIsLiveMode] = useState<boolean>(true);
   const [dynamicResult, setDynamicResult] = useState<DiscoveryEngineResult | null>(null);
   const [isDiscovering, setIsDiscovering] = useState<boolean>(false);
 
@@ -155,10 +151,7 @@ export const App: React.FC = () => {
     [inputs.quantity, inputs.quantityUnit]
   );
 
-  // Simulated markets tailored specifically to current crop's economics (Phase 1-4 baseline)
-  const markets = useMemo(() => getSimulatedMarketsForCrop(currentCrop), [currentCrop]);
-
-  // Phase 5: Execute Dynamic National Mandi Discovery & Profit Engine
+  // Phase 5: Execute Dynamic National Mandi Discovery & Profit Engine (Always Real / Discovered Data)
   useEffect(() => {
     let isMounted = true;
     setIsDiscovering(true);
@@ -173,7 +166,6 @@ export const App: React.FC = () => {
       {
         sortOption,
         filters,
-        apiKey: isLiveMode ? undefined : 'DEMO_BENCHMARK',
       }
     )
       .then((res) => {
@@ -199,36 +191,134 @@ export const App: React.FC = () => {
     inputs.maturity,
     sortOption,
     filters,
-    isLiveMode,
   ]);
 
-  // Phase 1-4: Execute Baseline Calculation Engine
-  const ranking = useMemo(
-    () => rankMarketsByNetReturn(inputs, currentCrop, markets),
-    [inputs, currentCrop, markets]
-  );
+  // Verified market calculations derived exclusively from dynamic mandi discovery
+  const verifiedEvaluations = useMemo(() => {
+    if (!dynamicResult) return [];
+    return dynamicResult.evaluatedMarkets.filter(
+      (m) => m.hasVerifiedPrice && m.priceRecord && m.priceRecord.modalPrice > 0
+    );
+  }, [dynamicResult]);
 
-  // Highest Price vs Highest Net Return comparison
-  const comparison = useMemo(
-    () =>
-      analyzeHighestPriceVsNetReturn(
-        ranking.allResults,
-        ranking.feasibleMarkets,
-        inputs.gradeDistribution
-      ),
-    [ranking, inputs.gradeDistribution]
-  );
+  const verifiedMarketCalculations = useMemo(() => {
+    return verifiedEvaluations.map(convertDynamicToMarketCalculationResult);
+  }, [verifiedEvaluations]);
 
-  // Split-Harvest optimization
-  const splitResult = useMemo(
-    () =>
-      optimizeSplitHarvest(
-        inputs,
-        currentCrop,
-        markets,
-        ranking.bestMarket
-      ),
-    [inputs, currentCrop, markets, ranking.bestMarket]
+  const verifiedFeasibleMarkets = useMemo(() => {
+    return verifiedMarketCalculations
+      .filter((m) => m.isFeasible)
+      .sort((a, b) => b.netReturn - a.netReturn);
+  }, [verifiedMarketCalculations]);
+
+  const bestSingleMarket = useMemo(() => {
+    if (dynamicResult?.recommendedMarket && dynamicResult.recommendedMarket.hasVerifiedPrice) {
+      return convertDynamicToMarketCalculationResult(dynamicResult.recommendedMarket);
+    }
+    return verifiedFeasibleMarkets.length > 0 ? verifiedFeasibleMarkets[0] : null;
+  }, [dynamicResult, verifiedFeasibleMarkets]);
+
+  const eligibleRealMarkets = useMemo(() => {
+    return verifiedFeasibleMarkets.map((m) => m.market);
+  }, [verifiedFeasibleMarkets]);
+
+  // Highest Price vs Highest Net Return comparison (using actual verified markets)
+  const comparison = useMemo(() => {
+    if (verifiedFeasibleMarkets.length === 0) return null;
+    return analyzeHighestPriceVsNetReturn(
+      verifiedMarketCalculations,
+      verifiedFeasibleMarkets,
+      inputs.gradeDistribution
+    );
+  }, [verifiedMarketCalculations, verifiedFeasibleMarkets, inputs.gradeDistribution]);
+
+  // Split-Harvest optimization (using actual verified markets)
+  const splitResult = useMemo(() => {
+    if (eligibleRealMarkets.length < 2 || !bestSingleMarket) {
+      return {
+        recommendedStrategy: bestSingleMarket ? 'single' : 'none',
+        baselineSingleMarket: bestSingleMarket,
+        allocations: [],
+        planTotals: bestSingleMarket
+          ? {
+              totalAllocatedQuintals: bestSingleMarket.initialQuantityQuintals,
+              totalLossQuintals: bestSingleMarket.physicalLossQuintals,
+              totalSaleableQuintals: bestSingleMarket.saleableQuantityQuintals,
+              totalGrossRevenue: bestSingleMarket.grossRevenue,
+              totalTransportCost: bestSingleMarket.transportationCost,
+              totalMarketFees: bestSingleMarket.totalMarketFees,
+              totalNetReturn: bestSingleMarket.netReturn,
+              netReturnPerQuintal: bestSingleMarket.netReturnPerQuintal,
+            }
+          : {
+              totalAllocatedQuintals: 0,
+              totalLossQuintals: 0,
+              totalSaleableQuintals: 0,
+              totalGrossRevenue: 0,
+              totalTransportCost: 0,
+              totalMarketFees: 0,
+              totalNetReturn: 0,
+              netReturnPerQuintal: 0,
+            },
+        baselineTotals: bestSingleMarket
+          ? {
+              totalAllocatedQuintals: bestSingleMarket.initialQuantityQuintals,
+              totalLossQuintals: bestSingleMarket.physicalLossQuintals,
+              totalSaleableQuintals: bestSingleMarket.saleableQuantityQuintals,
+              totalGrossRevenue: bestSingleMarket.grossRevenue,
+              totalTransportCost: bestSingleMarket.transportationCost,
+              totalMarketFees: bestSingleMarket.totalMarketFees,
+              totalNetReturn: bestSingleMarket.netReturn,
+              netReturnPerQuintal: bestSingleMarket.netReturnPerQuintal,
+            }
+          : null,
+        totalNetReturn: bestSingleMarket ? bestSingleMarket.netReturn : 0,
+        singleBestNetReturn: bestSingleMarket ? bestSingleMarket.netReturn : 0,
+        totalAllocatedQuintals: bestSingleMarket ? bestSingleMarket.initialQuantityQuintals : 0,
+        totalSaleableQuintals: bestSingleMarket ? bestSingleMarket.saleableQuantityQuintals : 0,
+        netGainFromSplitting: 0,
+        netGainPerQuintal: 0,
+        isSplitAdvantageous: false,
+        hasFeasibleSplit: false,
+        explanation:
+          eligibleRealMarkets.length < 2
+            ? 'Not enough verified market data to calculate a split-harvest plan.'
+            : 'No single market or split plan meets all feasibility criteria.',
+        strategyRationale:
+          eligibleRealMarkets.length < 2
+            ? 'At least two verified APMC markets are required to evaluate a split-harvest allocation.'
+            : 'Feasibility constraints unmet.',
+        rejectedPlans: [],
+        searchMetadata: {
+          plansEvaluated: 0,
+          feasiblePlansCount: 0,
+          discretizationStepQuintals: 1,
+          assumptions: [],
+        },
+      } as SplitHarvestResult;
+    }
+
+    return optimizeSplitHarvest(
+      inputs,
+      currentCrop,
+      eligibleRealMarkets,
+      bestSingleMarket
+    );
+  }, [inputs, currentCrop, eligibleRealMarkets, bestSingleMarket]);
+
+  // Verified ranking result for reports and modals
+  const verifiedRanking: MarketRankingResult = useMemo(
+    () => ({
+      bestMarket: bestSingleMarket,
+      feasibleMarkets: verifiedFeasibleMarkets,
+      infeasibleMarkets: [],
+      allResults: verifiedMarketCalculations,
+      totalMarketsEvaluated: verifiedMarketCalculations.length,
+      feasibleMarketsCount: verifiedFeasibleMarkets.length,
+      infeasibleMarketsCount: 0,
+      hasFeasibleMarkets: verifiedFeasibleMarkets.length > 0,
+    }),
+    [bestSingleMarket, verifiedFeasibleMarkets, verifiedMarketCalculations]
   );
 
   // Validation
@@ -237,25 +327,23 @@ export const App: React.FC = () => {
   // Determine overall agricultural price data source status
   const overallPriceStatus = useMemo<'LIVE' | 'CACHED' | 'SAMPLE' | 'UNAVAILABLE'>(() => {
     if (!dynamicResult || dynamicResult.evaluatedMarkets.length === 0) {
-      return 'SAMPLE';
+      return 'UNAVAILABLE';
     }
     const verifiedPrices = dynamicResult.evaluatedMarkets.filter((m) => m.hasVerifiedPrice);
     if (verifiedPrices.length === 0) return 'UNAVAILABLE';
     const sourceTypes = verifiedPrices.map((m) => m.priceSourceType);
     if (sourceTypes.includes('LIVE')) return 'LIVE';
-    if (sourceTypes.includes('CACHED')) return 'CACHED';
-    return 'SAMPLE';
+    if (sourceTypes.includes('CACHED') || sourceTypes.includes('WEB_DISCOVERED') || sourceTypes.includes('HISTORICAL')) {
+      return 'CACHED';
+    }
+    return 'UNAVAILABLE';
   }, [dynamicResult]);
 
   // Handlers
   const handleCropChange = (crop: CropProfile) => {
-    const defaultPrice = Math.round(
-      (crop.typicalMarketPriceRange.min + crop.typicalMarketPriceRange.max) / 2
-    );
     setInputs((prev) => ({
       ...prev,
       cropId: crop.id,
-      expectedPricePerQuintal: defaultPrice,
       maturity: crop.defaultFreshness,
     }));
   };
@@ -376,11 +464,7 @@ export const App: React.FC = () => {
         <div className="space-y-8">
           {/* Section: Top Hero Metric Cards */}
           <MetricCards
-            bestMarket={
-              dynamicResult?.recommendedMarket
-                ? convertDynamicToMarketCalculationResult(dynamicResult.recommendedMarket)
-                : ranking.bestMarket
-            }
+            bestMarket={bestSingleMarket}
             totalHarvestQuintals={totalQuintals}
           />
 
@@ -415,13 +499,11 @@ export const App: React.FC = () => {
                 onLocationChange={handleLocationChange}
               />
 
-              {/* 3. Harvest Details (including expected price) */}
+              {/* 3. Harvest Details */}
               <HarvestDetails
                 inputs={inputs}
                 onChange={(updates) => updateInputs((prev) => ({ ...prev, ...updates }))}
                 error={validation.errors.quantity}
-                typicalPriceMin={currentCrop.typicalMarketPriceRange.min}
-                typicalPriceMax={currentCrop.typicalMarketPriceRange.max}
               />
 
               {/* 4. Expected Produce Loss */}
@@ -451,7 +533,7 @@ export const App: React.FC = () => {
               />
             </div>
 
-            {/* Right Column: Ranked Markets, Split Harvest, Waterfall Chart, Infeasible Options */}
+            {/* Right Column: Ranked Markets, Split Harvest, Waterfall Chart, Markets Compared */}
             <div className="lg:col-span-7 space-y-8">
               {/* Phase 5: Dynamic National Mandi Discovery & Live AGMARKNET Prices */}
               {isDiscovering && !dynamicResult ? (
@@ -476,8 +558,6 @@ export const App: React.FC = () => {
                   onSortChange={setSortOption}
                   onFilterChange={(newF) => setFilters((prev) => ({ ...prev, ...newF }))}
                   onSelectBreakdown={handleSelectDynamicBreakdown}
-                  isLiveMode={isLiveMode}
-                  onToggleLiveMode={setIsLiveMode}
                   apiStatus={dynamicResult.apiStatus}
                   cropName={currentCrop.name}
                   discoveryLevel={dynamicResult.discoveryLevel}
@@ -489,30 +569,15 @@ export const App: React.FC = () => {
               <SplitHarvestSection splitResult={splitResult} />
 
               {/* Financial Waterfall Chart ("Where Your Money Goes") */}
-              <FinancialWaterfallChart bestMarket={ranking.bestMarket} />
+              <FinancialWaterfallChart bestMarket={bestSingleMarket} />
 
-              {/* Baseline Regional Feasible Single-Market Ranking Table ("Markets Compared") */}
+              {/* Verified Feasible Single-Market Ranking Table ("Markets Compared") */}
               <MarketRankingTable
-                feasibleMarkets={ranking.feasibleMarkets}
-                onSelectMarket={(m) => setSelectedBreakdownMarket(m)}
-              />
-
-              {/* Infeasible Markets Section ("Markets That Cannot Buy Your Full Crop") */}
-              <InfeasibleMarketsSection
-                infeasibleMarkets={ranking.infeasibleMarkets}
+                feasibleMarkets={verifiedFeasibleMarkets}
                 onSelectMarket={(m) => setSelectedBreakdownMarket(m)}
               />
             </div>
           </div>
-
-          {/* Phase 5B: AI Crop Price Forecast & Sell Now vs Sell Later Analysis */}
-          <CropPriceForecastSection
-            currentCrop={currentCrop}
-            totalQuintals={totalQuintals}
-            evaluations={dynamicResult?.evaluatedMarkets || []}
-            recommendedMarket={dynamicResult?.recommendedMarket || null}
-            transportConfig={inputs.transport}
-          />
         </div>
       </main>
 
@@ -540,7 +605,7 @@ export const App: React.FC = () => {
           inputs={inputs}
           crop={currentCrop}
           totalQuintals={totalQuintals}
-          ranking={ranking}
+          ranking={verifiedRanking}
           splitResult={splitResult}
           comparison={comparison}
           onClose={() => setIsReportModalOpen(false)}

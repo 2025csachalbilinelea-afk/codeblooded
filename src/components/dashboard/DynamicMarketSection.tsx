@@ -45,8 +45,6 @@ interface DynamicMarketSectionProps {
   onSortChange: (sort: MandiSortOption) => void;
   onFilterChange: (filters: Partial<MandiFilterOptions>) => void;
   onSelectBreakdown: (mandi: DynamicMandiEvaluation) => void;
-  isLiveMode: boolean;
-  onToggleLiveMode: (live: boolean) => void;
   apiStatus?: { isAvailable: boolean; lastError?: string; lastSyncTime?: string };
   cropName?: string;
   discoveryLevel?: DiscoveryLevel;
@@ -189,33 +187,6 @@ function renderPriceSourceBadge(
     );
   }
 
-  if (resolvedType === 'FARMER_EXPECTED') {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-300">
-        <span className="w-1.5 h-1.5 rounded-full bg-teal-600 mr-1" />
-        Expected price
-      </span>
-    );
-  }
-
-  if (resolvedType === 'SAMPLE') {
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenProvenance?.();
-        }}
-        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer"
-        title="Click to view benchmark details"
-      >
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 mr-1" />
-        <span>Demo benchmark</span>
-        <Info className="w-2.5 h-2.5 text-amber-600 ml-1 opacity-70" />
-      </button>
-    );
-  }
-
   // Unavailable / unquoted
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
@@ -235,8 +206,6 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
   onSortChange,
   onFilterChange,
   onSelectBreakdown,
-  isLiveMode,
-  onToggleLiveMode,
   apiStatus,
   cropName,
   discoveryLevel,
@@ -292,35 +261,8 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
             </p>
           </div>
 
-          {/* Mode Switcher: Live AGMARKNET vs Demo Benchmarks */}
+          {/* View Mode Switcher */}
           <div className="flex items-center space-x-3 self-start lg:self-center">
-            <div className="flex items-center bg-rural-cream p-1 rounded-2xl border border-rural-border text-xs">
-              <button
-                type="button"
-                onClick={() => onToggleLiveMode(true)}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer ${
-                  isLiveMode
-                    ? 'bg-rural-forest text-white shadow-sm'
-                    : 'text-rural-muted hover:text-rural-charcoal'
-                }`}
-              >
-                <Database className="w-3.5 h-3.5 text-rural-fresh" />
-                <span>Live AGMARKNET</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onToggleLiveMode(false)}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer ${
-                  !isLiveMode
-                    ? 'bg-amber-600 text-white shadow-sm'
-                    : 'text-rural-muted hover:text-rural-charcoal'
-                }`}
-              >
-                <span>Demo Benchmarks</span>
-              </button>
-            </div>
-
-            {/* View Mode Switcher */}
             <div className="flex items-center bg-rural-cream p-1 rounded-2xl border border-rural-border text-xs">
               <button
                 type="button"
@@ -496,18 +438,6 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-amber-200 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-amber-800">
-                You can switch to Demo Benchmarks mode to view indicative state APMC historical modal rates.
-              </p>
-              <button
-                type="button"
-                onClick={() => onToggleLiveMode(false)}
-                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer"
-              >
-                Switch to Demo Benchmarks
-              </button>
-            </div>
           </div>
         ) : (
           /* Legitimate empty state after 3-level search across 30-day lookback */
@@ -542,9 +472,6 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                 </li>
                 <li>
                   Try selecting a related agricultural commodity or staple crop from the crop selector.
-                </li>
-                <li>
-                  Toggle to <strong>Demo Benchmarks</strong> mode if you want to explore indicative economic models and transport calculations for planning.
                 </li>
               </ul>
             </div>
@@ -656,9 +583,6 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                     <span className="text-base font-bold text-emerald-700">
                       ₹{recommendedMarket.priceRecord?.modalPrice || 0}/Qtl
                     </span>
-                    <span className="text-[10px] text-rural-muted block">
-                      {recommendedMarket.priceRecord?.arrivalDate}
-                    </span>
                     {recommendedMarket.forecast?.available && (
                       <div className="mt-1 inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
                         <Sparkles className="w-2.5 h-2.5 text-emerald-700" />
@@ -698,7 +622,7 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
             {/* Bottom Disclaimer */}
             <div className="mt-4 pt-3 border-t border-white/10 text-[11px] text-rural-mint/80 flex flex-wrap items-center justify-between gap-2">
               <span>
-                Source: {recommendedMarket.priceRecord?.source || 'Verified APMC Yard Bulletin'} (Arrival: {recommendedMarket.priceRecord?.arrivalDate})
+                Source: {recommendedMarket.priceRecord?.source || 'Verified APMC Yard Bulletin'}
               </span>
               <span className="italic">
                 * Indicative wholesale price from daily arrivals; not a guaranteed buyer contract.
@@ -798,10 +722,7 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                       </td>
                       <td className="py-3 px-3">
                         {mandi.hasVerifiedPrice && mandi.priceRecord && mandi.priceRecord.modalPrice > 0 ? (
-                          <>
-                            <div className="font-bold text-emerald-700">₹{mandi.priceRecord.modalPrice.toLocaleString('en-IN')}/Qtl</div>
-                            <div className="text-[10px] text-rural-muted">{mandi.priceRecord.arrivalDate || 'N/A'}</div>
-                          </>
+                          <div className="font-bold text-emerald-700">₹{mandi.priceRecord.modalPrice.toLocaleString('en-IN')}/Qtl</div>
                         ) : (
                           <div className="text-[11px] font-semibold text-rose-700">Price Unavailable</div>
                         )}
@@ -944,19 +865,13 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                           : 'Price Unavailable'}
                       </span>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-rural-muted block">Arrival Date</span>
-                      <span className="text-[11px] font-semibold text-rural-charcoal">
-                        {mandi.hasVerifiedPrice && mandi.priceRecord?.arrivalDate && mandi.priceRecord.arrivalDate !== 'N/A'
-                          ? mandi.priceRecord.arrivalDate
-                          : 'N/A'}
-                      </span>
-                      {mandi.forecast?.available && (
-                        <span className="inline-block mt-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
+                    {mandi.forecast?.available && (
+                      <div className="text-right">
+                        <span className="inline-block text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
                           7d: ₹{mandi.forecast.forecasts.d7.predictedPrice}
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
                   {mandi.forecast?.available && mandi.forecast.forecasts && (

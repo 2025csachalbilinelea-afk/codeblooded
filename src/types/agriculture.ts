@@ -108,7 +108,7 @@ export interface SimulatedMarket {
     B: number;
     C: number;
   };
-  simulatedFlag: true;
+  simulatedFlag?: boolean;
 }
 
 export interface FarmerInputs {

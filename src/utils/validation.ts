@@ -37,13 +37,6 @@ export function validateFarmerInputs(inputs: FarmerInputs): ValidationResult {
     }
   }
 
-  // Validate expected price if provided
-  if (inputs.expectedPricePerQuintal !== undefined) {
-    if (isNaN(inputs.expectedPricePerQuintal) || inputs.expectedPricePerQuintal <= 0) {
-      errors.price = 'Expected selling price must be greater than zero.';
-    }
-  }
-
   if (inputs.spoilage.mode === 'manual') {
     const manualVal = Number(inputs.spoilage.manualPercentage);
     if (isNaN(manualVal) || manualVal < 0 || manualVal > 100) {

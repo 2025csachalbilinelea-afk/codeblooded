@@ -16,7 +16,6 @@ import {
 } from '../types/marketDiscovery';
 import {
   VERIFIED_AGMARKNET_PRICES,
-  REGIONAL_STATE_BENCHMARKS,
 } from '../data/agmarknetBenchmarks';
 import {
   calculateHaversineDistance,
@@ -231,7 +230,7 @@ export async function getMarketPriceForCommodity(
       ? { apiKey: apiKeyOrOptions }
       : (apiKeyOrOptions || {});
 
-  const isDemoBenchmark = options.apiKey === 'DEMO_BENCHMARK';
+  const isDemoBenchmark = false;
 
   // Step 1: Check memory / localStorage cache
   const cached = getCachedPrice(marketId, normCommodity);
@@ -500,74 +499,7 @@ export async function getMarketPriceForCommodity(
     }
   }
 
-  // PRIORITY 4: Regional District or State Benchmark Price
-  const stateBenchmarks = REGIONAL_STATE_BENCHMARKS[state] || REGIONAL_STATE_BENCHMARKS['All India'];
-  const stateCommodityBenchmark =
-    stateBenchmarks?.[normCommodity] || REGIONAL_STATE_BENCHMARKS['All India']?.[normCommodity];
-
-  if (stateCommodityBenchmark) {
-    const validated = resolveValidatedPriceStatus({
-      record: {
-        marketId,
-        marketName,
-        state,
-        district,
-        commodity: normCommodity,
-        variety: 'State FAQ Benchmark',
-        grade: 'FAQ',
-        arrivalDate: stateCommodityBenchmark.arrivalDate,
-        minPrice: stateCommodityBenchmark.minPrice,
-        maxPrice: stateCommodityBenchmark.maxPrice,
-        modalPrice: stateCommodityBenchmark.modalPrice,
-        source: stateCommodityBenchmark.source,
-        confidenceIndicator: 'LOW',
-        fallbackTier: 4,
-        priceSourceType: 'REGIONAL_BENCHMARK',
-      },
-      isDemoBenchmark,
-      requestedCommodity: normCommodity,
-      targetMarketId: marketId,
-      targetMarketName: marketName,
-    });
-
-    if (validated.isValid && validated.sanitizedRecord) {
-      setCachedPrice(validated.sanitizedRecord);
-      return validated.sanitizedRecord;
-    }
-  }
-
-  // PRIORITY 5: Farmer-Entered Expected Price (Demo Benchmarks Mode ONLY)
-  if (isDemoBenchmark && options.expectedPricePerQuintal && options.expectedPricePerQuintal > 0) {
-    const expPrice = Math.round(options.expectedPricePerQuintal);
-    const validated = resolveValidatedPriceStatus({
-      record: {
-        marketId,
-        marketName,
-        state,
-        district,
-        commodity: normCommodity,
-        variety: 'Farmer Stated Grade',
-        grade: 'Standard',
-        arrivalDate: new Date().toISOString().split('T')[0],
-        minPrice: Math.round(expPrice * 0.95),
-        maxPrice: Math.round(expPrice * 1.05),
-        modalPrice: expPrice,
-        source: 'Farmer Entered Expected Price',
-        confidenceIndicator: 'ESTIMATE',
-        fallbackTier: 5,
-      },
-      isDemoBenchmark,
-      requestedCommodity: normCommodity,
-      targetMarketId: marketId,
-      targetMarketName: marketName,
-    });
-
-    if (validated.isValid && validated.sanitizedRecord) {
-      return validated.sanitizedRecord;
-    }
-  }
-
-  // All 5 tiers failed: return null
+  // Unquoted or unverified: return null (status strictly resolves to UNAVAILABLE with 0 price)
   return null;
 }
 
@@ -600,7 +532,7 @@ export async function discoverNationalCommodityPrices(
   const maxLookbackDays = options?.maxLookbackDays || 30;
   const cutoffTime = Date.now() - maxLookbackDays * 24 * 60 * 60 * 1000;
   const keyToUse = getEnvApiKey(options?.apiKey);
-  const isDemoBenchmark = options?.apiKey === 'DEMO_BENCHMARK';
+  const isDemoBenchmark = false;
 
   let discoveredApiRecords: Array<Record<string, string>> = [];
   let apiErrorCategory: ApiErrorCategory | undefined;

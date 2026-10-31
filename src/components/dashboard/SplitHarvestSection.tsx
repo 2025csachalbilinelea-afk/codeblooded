@@ -27,7 +27,29 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
   const [showAssumptions, setShowAssumptions] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
 
-  if (!splitResult) return null;
+  if (!splitResult) {
+    return (
+      <div className="bg-white rounded-3xl border border-rural-border shadow-rural-card p-6 sm:p-7 overflow-hidden">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-10 h-10 rounded-2xl bg-rural-sage text-rural-forest flex items-center justify-center shadow-sm">
+            <Split className="w-5 h-5 stroke-[2.2]" />
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-serif font-bold text-rural-forest">
+              Should You Sell at One Market or More Than One?
+            </h2>
+            <p className="text-xs sm:text-sm text-rural-muted mt-0.5 font-sans">
+              Compare selling all produce at a single destination versus dividing your harvest between two markets.
+            </p>
+          </div>
+        </div>
+        <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs sm:text-sm text-amber-900 flex items-center space-x-2.5">
+          <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+          <span>Not enough verified market data to calculate a split-harvest plan.</span>
+        </div>
+      </div>
+    );
+  }
 
   const {
     recommendedStrategy,
@@ -86,6 +108,11 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
             <span className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-rural-sage text-rural-forest border border-rural-border shadow-sm">
               <Trophy className="w-4 h-4 text-rural-primary" />
               <span>Recommended: Single Market</span>
+            </span>
+          ) : explanation.includes('Not enough verified market data') ? (
+            <span className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-sm">
+              <AlertCircle className="w-4 h-4 text-slate-500" />
+              <span>Not Enough Verified Market Data</span>
             </span>
           ) : (
             <span className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-sm">
@@ -150,13 +177,19 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
           <div className="text-base font-serif font-bold text-rural-forest truncate">
             {hasFeasibleSplit
               ? `${allocations.length} Markets (${allocations.map((a) => a.market.name.split(' ')[0]).join(' + ')})`
+              : explanation.includes('Not enough verified market data')
+              ? 'Not Enough Verified Market Data'
               : 'No Feasible Split Plan'}
           </div>
           <div className={`text-2xl font-black mt-1 font-sans ${isSplitRecommended ? 'text-rural-forest' : 'text-rural-charcoal'}`}>
             {hasFeasibleSplit ? formatINR(planTotals.totalNetReturn) : '—'}
           </div>
           <p className="text-xs text-rural-muted mt-1 font-sans">
-            {hasFeasibleSplit ? `${formatINR(planTotals.netReturnPerQuintal)} / Qtl money kept` : 'Capacity constraints unmet'}
+            {hasFeasibleSplit
+              ? `${formatINR(planTotals.netReturnPerQuintal)} / Qtl money kept`
+              : explanation.includes('Not enough verified market data')
+              ? 'Requires at least 2 verified markets'
+              : 'Capacity constraints unmet'}
           </p>
         </div>
 
@@ -185,6 +218,8 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
           <div className="text-2xl font-black tracking-tight font-sans">
             {isNoneFeasible
               ? 'Not Possible'
+              : explanation.includes('Not enough verified market data')
+              ? '—'
               : !baselineSingleMarket && hasFeasibleSplit
               ? 'Only Working Option'
               : netGainFromSplitting >= 0
@@ -194,6 +229,8 @@ export const SplitHarvestSection: React.FC<SplitHarvestSectionProps> = ({
           <p className={`text-xs mt-1 font-sans ${isSplitAdvantageous ? 'text-rural-mint/80' : 'text-rural-muted'}`}>
             {isSplitAdvantageous
               ? `+${formatINR(netGainPerQuintal)}/Qtl gained by dividing harvest`
+              : explanation.includes('Not enough verified market data')
+              ? 'Not enough verified market data to calculate a split-harvest plan.'
               : isSingleRecommended
               ? `Single market saves ${formatINR(Math.abs(netGainFromSplitting))} in duplicate travel expenses`
               : 'No allocation possible'}

@@ -124,7 +124,21 @@ export const MarketRankingTable: React.FC<MarketRankingTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-rural-border/50 font-medium">
-            {sorted.map((res, idx) => {
+            {sorted.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="py-10 px-4 text-center text-rural-muted text-xs sm:text-sm">
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <p className="font-serif font-bold text-base text-rural-forest">
+                      No Verified Market Records Available to Compare
+                    </p>
+                    <p className="text-xs text-rural-muted">
+                      Markets Compared strictly displays actual, verified mandi quotations retrieved for your harvest. No demo data is used.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              sorted.map((res, idx) => {
               const isBest = idx === 0 && sortField === 'netReturn' && !sortAsc;
               return (
                 <tr
@@ -241,7 +255,8 @@ export const MarketRankingTable: React.FC<MarketRankingTableProps> = ({
                   </td>
                 </tr>
               );
-            })}
+            })
+          )}
           </tbody>
         </table>
       </div>
