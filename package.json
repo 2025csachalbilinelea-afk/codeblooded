@@ -4,10 +4,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node scripts/verify.mjs"
+    "test": "node scripts/verify.mjs",
+    "test:ml": "node scripts/test-phase5b.mjs",
+    "train": "python ml/train_models.py",
+    "ml:server": "python ml/server.py",
+    "api:server": "node scripts/server.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

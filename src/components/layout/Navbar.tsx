@@ -7,6 +7,7 @@ interface NavbarProps {
   onResetDefaults: () => void;
   onPrint: () => void;
   onToggleVerification?: () => void;
+  priceStatus?: 'LIVE' | 'CACHED' | 'SAMPLE' | 'UNAVAILABLE';
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -14,6 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onResetDefaults,
   onPrint,
   onToggleVerification,
+  priceStatus = 'CACHED',
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-rural-forest border-b border-rural-deep text-white shadow-md">
@@ -49,12 +51,32 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="hidden sm:inline">Home</span>
             </button>
 
-            {/* Demonstration Sample Data Notice */}
-            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-amber-950/70 border border-amber-500/40 text-amber-300 text-xs font-medium">
-              <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="hidden md:inline">Sample Prices — Check Before Selling</span>
-              <span className="md:hidden">Sample Prices</span>
-            </div>
+            {/* Dynamic Agricultural Price Source Status */}
+            {priceStatus === 'LIVE' ? (
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="hidden md:inline">Live AGMARKNET Feed — Verified Arrivals</span>
+                <span className="md:hidden">Live AGMARKNET</span>
+              </div>
+            ) : priceStatus === 'CACHED' ? (
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-sky-950/70 border border-sky-500/40 text-sky-300 text-xs font-medium">
+                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                <span className="hidden md:inline">Cached AGMARKNET Data — Check Before Selling</span>
+                <span className="md:hidden">Cached AGMARKNET</span>
+              </div>
+            ) : priceStatus === 'UNAVAILABLE' ? (
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-rose-950/70 border border-rose-500/40 text-rose-300 text-xs font-medium">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span className="hidden md:inline">Prices Unavailable — Check Mandi Directly</span>
+                <span className="md:hidden">Prices Unavailable</span>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-amber-950/70 border border-amber-500/40 text-amber-300 text-xs font-medium">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="hidden md:inline">Sample Prices — Check Before Selling</span>
+                <span className="md:hidden">Sample Prices</span>
+              </div>
+            )}
 
             {/* Test Runner */}
             {onToggleVerification && (

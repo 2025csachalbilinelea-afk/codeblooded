@@ -313,7 +313,14 @@ export const MarketReportModal: React.FC<MarketReportModalProps> = ({
                     {ranking.feasibleMarkets.map((res: MarketCalculationResult, i: number) => (
                       <tr key={res.market.id} className={i === 0 ? 'bg-rural-mint/30 font-semibold' : ''}>
                         <td className="p-2.5">
-                          #{i + 1} {res.market.name} {i === 0 && <span className="text-[9px] bg-rural-primary text-white px-1.5 py-0.5 rounded-full uppercase ml-1 font-sans">Best</span>}
+                          <div className="font-bold text-rural-forest">
+                            #{i + 1} {res.market.name} {i === 0 && <span className="text-[9px] bg-rural-primary text-white px-1.5 py-0.5 rounded-full uppercase ml-1 font-sans">Best</span>}
+                          </div>
+                          {res.market.description && (
+                            <div className="text-[9px] text-rural-muted max-w-xs mt-0.5 leading-tight">
+                              {res.market.description}
+                            </div>
+                          )}
                         </td>
                         <td className="p-2.5">{res.market.distanceKm} km ({res.market.estimatedTravelTimeHours}h)</td>
                         <td className="p-2.5">{formatINR(res.market.pricesPerQuintal.A)}/Qtl</td>

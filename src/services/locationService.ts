@@ -30,6 +30,7 @@ export const INDIAN_AGRI_DISTRICT_PRESETS: DistrictGeoPreset[] = [
   { state: 'Karnataka', district: 'Kolar', town: 'Srinivaspur Fruit Belt', pincode: '563135', latitude: 13.3364, longitude: 78.2167 },
   { state: 'Karnataka', district: 'Bengaluru Rural', town: 'Doddaballapur Belt', pincode: '561203', latitude: 13.2929, longitude: 77.5414 },
   { state: 'Karnataka', district: 'Mysuru', town: 'Nanjangud Farm Gate', pincode: '571301', latitude: 12.1189, longitude: 76.6806 },
+  { state: 'Karnataka', district: 'Mandya', town: 'Mandya Sugar & Agri Belt', pincode: '571401', latitude: 12.5218, longitude: 76.8951 },
   { state: 'Karnataka', district: 'Davanagere', town: 'Harihar Agro Belt', pincode: '577601', latitude: 14.5133, longitude: 75.8033 },
 
   // Maharashtra

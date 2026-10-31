@@ -33,6 +33,7 @@ import { TransportConfigForm } from './components/forms/TransportConfig';
 import { MetricCards } from './components/dashboard/MetricCards';
 import { ComparisonCard } from './components/dashboard/ComparisonCard';
 import { DynamicMarketSection } from './components/dashboard/DynamicMarketSection';
+import { CropPriceForecastSection } from './components/dashboard/CropPriceForecastSection';
 import { MarketRankingTable } from './components/markets/MarketRankingTable';
 import { SplitHarvestSection } from './components/dashboard/SplitHarvestSection';
 import { InfeasibleMarketsSection } from './components/markets/InfeasibleMarketsSection';
@@ -233,6 +234,19 @@ export const App: React.FC = () => {
   // Validation
   const validation = useMemo(() => validateFarmerInputs(inputs), [inputs]);
 
+  // Determine overall agricultural price data source status
+  const overallPriceStatus = useMemo<'LIVE' | 'CACHED' | 'SAMPLE' | 'UNAVAILABLE'>(() => {
+    if (!dynamicResult || dynamicResult.evaluatedMarkets.length === 0) {
+      return 'SAMPLE';
+    }
+    const verifiedPrices = dynamicResult.evaluatedMarkets.filter((m) => m.hasVerifiedPrice);
+    if (verifiedPrices.length === 0) return 'UNAVAILABLE';
+    const sourceTypes = verifiedPrices.map((m) => m.priceSourceType);
+    if (sourceTypes.includes('LIVE')) return 'LIVE';
+    if (sourceTypes.includes('CACHED')) return 'CACHED';
+    return 'SAMPLE';
+  }, [dynamicResult]);
+
   // Handlers
   const handleCropChange = (crop: CropProfile) => {
     const defaultPrice = Math.round(
@@ -288,6 +302,7 @@ export const App: React.FC = () => {
         onResetDefaults={handleResetDefaults}
         onPrint={handlePrint}
         onToggleVerification={() => setIsVerificationModalOpen(true)}
+        priceStatus={overallPriceStatus}
       />
 
       {/* Main Container */}
@@ -463,6 +478,10 @@ export const App: React.FC = () => {
                   onSelectBreakdown={handleSelectDynamicBreakdown}
                   isLiveMode={isLiveMode}
                   onToggleLiveMode={setIsLiveMode}
+                  apiStatus={dynamicResult.apiStatus}
+                  cropName={currentCrop.name}
+                  discoveryLevel={dynamicResult.discoveryLevel}
+                  apiErrorCategory={dynamicResult.apiErrorCategory}
                 />
               ) : null}
 
@@ -485,6 +504,15 @@ export const App: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Phase 5B: AI Crop Price Forecast & Sell Now vs Sell Later Analysis */}
+          <CropPriceForecastSection
+            currentCrop={currentCrop}
+            totalQuintals={totalQuintals}
+            evaluations={dynamicResult?.evaluatedMarkets || []}
+            recommendedMarket={dynamicResult?.recommendedMarket || null}
+            transportConfig={inputs.transport}
+          />
         </div>
       </main>
 

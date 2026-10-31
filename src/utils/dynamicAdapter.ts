@@ -31,7 +31,9 @@ export function convertDynamicToMarketCalculationResult(
       typicalWaitTimeHours: evalItem.market.typicalWaitHours,
       description: `Regulated APMC wholesale yard in ${evalItem.market.district}. Data source: ${
         evalItem.priceRecord?.source || 'APMC Daily Arrivals'
-      }.`,
+      }${evalItem.priceRecord?.arrivalDate ? ` (Arrival: ${evalItem.priceRecord.arrivalDate})` : ''}${
+        evalItem.priceRecord?.sourceUrl ? ` • URL: ${evalItem.priceRecord.sourceUrl}` : ''
+      } • Status: ${evalItem.internalPriceStatus || 'VERIFIED QUOTE'}`,
       simulatedFlag: true,
     },
     initialQuantityQuintals: evalItem.consignmentQuintals,
@@ -80,4 +82,3 @@ export function convertDynamicToMarketCalculationResult(
     averagePricePerQuintalSold: price,
   };
 }
-

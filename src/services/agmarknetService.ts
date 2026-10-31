@@ -2,11 +2,49 @@
  * HARVESTROUTE PHASE 5: LIVE AGRICULTURAL PRICE INTEGRATION & CACHING SERVICE
  * Integrates official Government of India AGMARKNET daily market prices via Data.gov.in.
  * Provides commodity normalization, price freshness calculation, localStorage caching,
- * and reliable fallback handling with zero fictional prices.
+ * centralized single-source-of-truth price validation, and honest fallback handling.
  */
 
-import { MarketPriceRecord, PriceFreshnessStatus, PriceSyncLog } from '../types/marketDiscovery';
-import { VERIFIED_AGMARKNET_PRICES } from '../data/agmarknetBenchmarks';
+import {
+  MarketPriceRecord,
+  PriceFreshnessStatus,
+  PriceSyncLog,
+  PriceSourceType,
+  ConfidenceIndicator,
+  DiscoveryLevel,
+  ApiErrorCategory,
+} from '../types/marketDiscovery';
+import {
+  VERIFIED_AGMARKNET_PRICES,
+  REGIONAL_STATE_BENCHMARKS,
+} from '../data/agmarknetBenchmarks';
+import {
+  calculateHaversineDistance,
+  getNationalMarketById,
+  NEIGHBORING_STATES,
+  PREMIER_NATIONAL_TERMINAL_HUBS,
+  VERIFIED_NATIONAL_MANDIS,
+} from '../data/nationalMandis';
+import { RECENT_PRICE_HISTORY_SERIES } from '../data/recentPriceHistory';
+import {
+  normalizeCommodityForAgmarknet,
+  isCommodityMatch,
+  isMarketIdentityMatch,
+  validateAndSanitizePrice,
+  evaluatePriceFreshness,
+  resolveValidatedPriceStatus,
+} from './priceValidationService';
+import { searchWebForCropPrices } from './webPriceDiscoveryService';
+
+// Re-export validation utilities for backward compatibility
+export {
+  normalizeCommodityForAgmarknet,
+  isCommodityMatch,
+  isMarketIdentityMatch,
+  validateAndSanitizePrice,
+  evaluatePriceFreshness,
+  resolveValidatedPriceStatus,
+};
 
 // Official Data.gov.in daily market arrival price catalog resource ID
 export const DATA_GOV_IN_RESOURCE_ID = '9ef84268-d588-465a-a308-a864a43d0070';
@@ -16,70 +54,36 @@ const CACHE_KEY = 'harvestroute_agmarknet_price_cache_v1';
 const SYNC_LOGS_KEY = 'harvestroute_price_sync_logs_v1';
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours TTL
 
-/**
- * Standardizes farmer commodity IDs/names to official AGMARKNET commodity nomenclature.
- */
-export function normalizeCommodityForAgmarknet(cropInput: string): string {
-  const norm = cropInput.toLowerCase().trim().replace(/[-_]/g, ' ');
-
-  if (norm.includes('tomato')) return 'Tomato';
-  if (norm.includes('onion')) return 'Onion';
-  if (norm.includes('potato')) return 'Potato';
-  if (norm.includes('wheat')) return 'Wheat';
-  if (norm.includes('paddy') || norm.includes('dhan')) return 'Paddy(Dhan)';
-  if (norm.includes('rice')) return 'Rice';
-  if (norm.includes('cotton')) return 'Cotton';
-  if (norm.includes('soybean') || norm.includes('soya')) return 'Soyabean';
-  if (norm.includes('maize') || norm.includes('corn')) return 'Maize';
-  if (norm.includes('mustard')) return 'Mustard';
-  if (norm.includes('chilli') || norm.includes('pepper')) return 'Chilli Red';
-  if (norm.includes('banana')) return 'Banana';
-  if (norm.includes('mango')) return 'Mango';
-  if (norm.includes('pomegranate')) return 'Pomegranate';
-  if (norm.includes('garlic')) return 'Garlic';
-  if (norm.includes('spinach') || norm.includes('palak')) return 'Spinach';
-  if (norm.includes('gram') || norm.includes('chana')) return 'Gram Raw(Chhana)';
-  if (norm.includes('moong')) return 'Moong(Green Gram)';
-
-  // Capitalize words as default
-  return cropInput.charAt(0).toUpperCase() + cropInput.slice(1);
+export interface AgmarknetApiStatus {
+  isAvailable: boolean;
+  lastError?: string;
+  lastSyncTime?: string;
 }
 
-/**
- * Evaluates the freshness status of an agricultural price record based on arrival date.
- * - CURRENT: Within 2 days of reference date
- * - RECENT: Within 7 days of reference date
- * - STALE: Older than 7 days
- * - UNAVAILABLE: Unparseable or empty date
- */
-export function evaluatePriceFreshness(
-  arrivalDateStr?: string,
-  referenceDate: Date = new Date()
-): PriceFreshnessStatus {
-  if (!arrivalDateStr) return 'UNAVAILABLE';
+let lastApiStatus: AgmarknetApiStatus = {
+  isAvailable: true,
+};
 
-  // Handle formats: YYYY-MM-DD or DD/MM/YYYY
-  let arrivalDate: Date;
-  if (arrivalDateStr.includes('/')) {
-    const parts = arrivalDateStr.split('/');
-    if (parts.length === 3) {
-      // Assuming DD/MM/YYYY
-      arrivalDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-    } else {
-      arrivalDate = new Date(arrivalDateStr);
-    }
-  } else {
-    arrivalDate = new Date(arrivalDateStr);
+export function getAgmarknetApiStatus(): AgmarknetApiStatus {
+  return { ...lastApiStatus };
+}
+
+export function setAgmarknetApiStatus(status: AgmarknetApiStatus): void {
+  lastApiStatus = { ...status };
+}
+
+export function getEnvApiKey(apiKey?: string): string | undefined {
+  if (apiKey) return apiKey;
+  const proc = (globalThis as unknown as { process?: { env?: Record<string, string> } })?.process;
+  if (proc?.env?.VITE_DATA_GOV_IN_API_KEY) {
+    return proc.env.VITE_DATA_GOV_IN_API_KEY;
   }
-
-  if (isNaN(arrivalDate.getTime())) return 'UNAVAILABLE';
-
-  const diffMs = referenceDate.getTime() - arrivalDate.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays <= 2) return 'CURRENT';
-  if (diffDays <= 7) return 'RECENT';
-  return 'STALE';
+  try {
+    const metaEnv = (new Function('return typeof import.meta !== "undefined" ? import.meta.env : undefined'))();
+    return metaEnv?.VITE_DATA_GOV_IN_API_KEY;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -89,19 +93,18 @@ let inMemoryCache: Record<string, { record: MarketPriceRecord; cachedAt: number 
 let inMemoryLogs: PriceSyncLog[] = [];
 
 /**
- * Reads cached price records.
+ * Reads cached price records with strict market identity, commodity, and price sanity verification.
  */
 export function getCachedPrice(marketId: string, commodity: string): MarketPriceRecord | null {
   const normCommodity = normalizeCommodityForAgmarknet(commodity).toLowerCase();
   const key = `${marketId}_${normCommodity}`;
 
+  let candidate: { record: MarketPriceRecord; cachedAt: number } | null = null;
+
   // Check in-memory first
   if (inMemoryCache[key] && Date.now() - inMemoryCache[key].cachedAt < CACHE_TTL_MS) {
-    return inMemoryCache[key].record;
-  }
-
-  // Check browser localStorage if available
-  if (typeof window !== 'undefined' && window.localStorage) {
+    candidate = inMemoryCache[key];
+  } else if (typeof window !== 'undefined' && window.localStorage) {
     try {
       const raw = localStorage.getItem(CACHE_KEY);
       if (raw) {
@@ -109,7 +112,7 @@ export function getCachedPrice(marketId: string, commodity: string): MarketPrice
         const entry = store[key];
         if (entry && Date.now() - entry.cachedAt < CACHE_TTL_MS) {
           inMemoryCache[key] = entry;
-          return entry.record;
+          candidate = entry;
         }
       }
     } catch {
@@ -117,11 +120,22 @@ export function getCachedPrice(marketId: string, commodity: string): MarketPrice
     }
   }
 
+  if (candidate && candidate.record) {
+    const validated = resolveValidatedPriceStatus({
+      record: candidate.record,
+      requestedCommodity: commodity,
+      targetMarketId: marketId,
+    });
+    if (validated.isValid && validated.sanitizedRecord) {
+      return validated.sanitizedRecord;
+    }
+  }
+
   return null;
 }
 
 /**
- * Saves price record to cache.
+ * Saves validated price record to cache.
  */
 export function setCachedPrice(record: MarketPriceRecord): void {
   const normCommodity = normalizeCommodityForAgmarknet(record.commodity).toLowerCase();
@@ -184,13 +198,23 @@ export function getPriceSyncLogs(): PriceSyncLog[] {
   return inMemoryLogs;
 }
 
+export interface PriceResolutionOptions {
+  apiKey?: string;
+  expectedPricePerQuintal?: number;
+  farmLatitude?: number;
+  farmLongitude?: number;
+}
+
 /**
  * Resolves the latest available price for a given mandi and commodity.
  * Hierarchy:
  * 1. Checks memory/localStorage cache.
- * 2. If online and API key present, queries Data.gov.in AGMARKNET feed.
- * 3. Falls back to verified authentic AGMARKNET benchmark dataset with exact reporting dates.
- * 4. If commodity not traded at that mandi, returns honest null with UNAVAILABLE status.
+ * 2. If online and API key present, queries Data.gov.in AGMARKNET feed (sorts by latest arrival date).
+ * 3. Priority 2: Direct authentic verified AGMARKNET quotation or historical daily series.
+ * 4. Priority 3: Latest quotation for same crop in nearby verified mandi within 350 km.
+ * 5. Priority 4: Regional state or national benchmark.
+ * 6. Priority 5: Farmer entered expected price.
+ * 7. When unquoted: returns null (status resolves strictly to UNAVAILABLE with 0 price).
  */
 export async function getMarketPriceForCommodity(
   marketId: string,
@@ -198,31 +222,34 @@ export async function getMarketPriceForCommodity(
   state: string,
   district: string,
   cropName: string,
-  apiKey?: string
+  apiKeyOrOptions?: string | PriceResolutionOptions
 ): Promise<MarketPriceRecord | null> {
   const normCommodity = normalizeCommodityForAgmarknet(cropName);
 
-  // 1. Check Cache
+  const options: PriceResolutionOptions =
+    typeof apiKeyOrOptions === 'string'
+      ? { apiKey: apiKeyOrOptions }
+      : (apiKeyOrOptions || {});
+
+  const isDemoBenchmark = options.apiKey === 'DEMO_BENCHMARK';
+
+  // Step 1: Check memory / localStorage cache
   const cached = getCachedPrice(marketId, normCommodity);
   if (cached) {
     return cached;
   }
 
-  // 2. Try Live Data.gov.in if key is provided or present in environment
-  const keyToUse =
-    apiKey ||
-    (typeof import.meta !== 'undefined' && import.meta.env
-      ? import.meta.env.VITE_DATA_GOV_IN_API_KEY
-      : undefined);
+  // PRIORITY 1: Live AGMARKNET Query via Data.gov.in
+  const keyToUse = getEnvApiKey(options.apiKey);
 
-  if (keyToUse && typeof fetch !== 'undefined') {
+  if (keyToUse && !isDemoBenchmark && typeof fetch !== 'undefined') {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       const endpoint = `${DATA_GOV_IN_BASE_URL}/${DATA_GOV_IN_RESOURCE_ID}?api-key=${encodeURIComponent(
         keyToUse
-      )}&format=json&limit=10&filters[state]=${encodeURIComponent(state)}&filters[commodity]=${encodeURIComponent(
+      )}&format=json&limit=50&filters[state]=${encodeURIComponent(state)}&filters[commodity]=${encodeURIComponent(
         normCommodity
       )}`;
 
@@ -230,55 +257,101 @@ export async function getMarketPriceForCommodity(
       clearTimeout(timeoutId);
 
       if (response.ok) {
+        lastApiStatus = {
+          isAvailable: true,
+          lastSyncTime: new Date().toISOString(),
+        };
         const json = await response.json();
-        const records = json.records || [];
+        const records = (json.records || []) as Array<Record<string, string>>;
 
-        // Match market record
-        const matchingRecord = records.find(
-          (r: Record<string, string>) =>
-            (r.market && r.market.toLowerCase().includes(marketName.toLowerCase())) ||
-            (r.district && r.district.toLowerCase() === district.toLowerCase())
-        );
+        // Match market records and sort by arrival_date descending to select the latest arrival!
+        const matchingRecords = records.filter((r) => {
+          if (!r.market) return false;
+          if (r.state && state && r.state.toLowerCase().trim() !== state.toLowerCase().trim()) return false;
+          if (r.commodity && !isCommodityMatch(r.commodity, normCommodity)) return false;
 
-        if (matchingRecord) {
-          const modalPrice = parseFloat(matchingRecord.modal_price) || 0;
-          const minPrice = parseFloat(matchingRecord.min_price) || modalPrice * 0.9;
-          const maxPrice = parseFloat(matchingRecord.max_price) || modalPrice * 1.1;
-          const arrivalDate = matchingRecord.arrival_date || new Date().toISOString().split('T')[0];
-          const freshness = evaluatePriceFreshness(arrivalDate);
-
-          const liveRecord: MarketPriceRecord = {
+          return isMarketIdentityMatch(
+            '',
+            r.market,
+            r.district || '',
+            r.state || '',
             marketId,
             marketName,
-            state,
             district,
-            commodity: normCommodity,
-            variety: matchingRecord.variety || 'Standard FAQ',
-            grade: matchingRecord.grade || 'FAQ',
-            arrivalDate,
-            minPrice: Math.round(minPrice),
-            maxPrice: Math.round(maxPrice),
-            modalPrice: Math.round(modalPrice),
-            priceUnit: 'INR/Quintal',
-            source: 'Data.gov.in (Official AGMARKNET Live Feed)',
-            retrievedAt: new Date().toISOString(),
-            freshnessStatus: freshness,
-          };
+            state
+          );
+        });
 
-          setCachedPrice(liveRecord);
-          recordPriceSyncLog({
-            timestamp: new Date().toISOString(),
-            endpoint: 'Data.gov.in AGMARKNET',
-            recordsCount: records.length,
-            status: 'SUCCESS',
-            lastSuccessfulSync: new Date().toISOString(),
+        if (matchingRecords.length > 0) {
+          // Sort by arrival date descending (latest first)
+          matchingRecords.sort((a, b) => {
+            const dateA = a.arrival_date ? new Date(a.arrival_date).getTime() : 0;
+            const dateB = b.arrival_date ? new Date(b.arrival_date).getTime() : 0;
+            return dateB - dateA;
           });
 
-          return liveRecord;
+          const latestRecord = matchingRecords[0];
+          const arrivalDate = latestRecord.arrival_date || new Date().toISOString().split('T')[0];
+
+          const validated = resolveValidatedPriceStatus({
+            record: {
+              marketId,
+              marketName,
+              state,
+              district,
+              commodity: normCommodity,
+              variety: latestRecord.variety || 'Standard FAQ',
+              grade: latestRecord.grade || 'FAQ',
+              arrivalDate,
+              minPrice: parseFloat(latestRecord.min_price),
+              maxPrice: parseFloat(latestRecord.max_price),
+              modalPrice: parseFloat(latestRecord.modal_price),
+              source: 'Data.gov.in (Official AGMARKNET Live Feed)',
+              priceSourceType: 'LIVE',
+              confidenceIndicator: 'HIGH',
+              fallbackTier: 1,
+            },
+            isLiveApiResult: true,
+            requestedCommodity: normCommodity,
+            targetMarketId: marketId,
+            targetMarketName: marketName,
+          });
+
+          if (validated.isValid && validated.sanitizedRecord) {
+            setCachedPrice(validated.sanitizedRecord);
+            recordPriceSyncLog({
+              timestamp: new Date().toISOString(),
+              endpoint: 'Data.gov.in AGMARKNET',
+              recordsCount: matchingRecords.length,
+              status: 'SUCCESS',
+              lastSuccessfulSync: new Date().toISOString(),
+            });
+
+            return validated.sanitizedRecord;
+          }
         }
+      } else {
+        const errMsg = `AGMARKNET API error HTTP ${response.status}: ${response.statusText}`;
+        lastApiStatus = {
+          isAvailable: false,
+          lastError: errMsg,
+          lastSyncTime: lastApiStatus.lastSyncTime,
+        };
+        recordPriceSyncLog({
+          timestamp: new Date().toISOString(),
+          endpoint: 'Data.gov.in AGMARKNET',
+          recordsCount: 0,
+          status: 'FAILED',
+          errorMessage: errMsg,
+        });
       }
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Network error';
+      lastApiStatus = {
+        isAvailable: false,
+        lastError: errMsg,
+        lastSyncTime: lastApiStatus.lastSyncTime,
+      };
       recordPriceSyncLog({
         timestamp: new Date().toISOString(),
         endpoint: 'Data.gov.in AGMARKNET',
@@ -289,24 +362,468 @@ export async function getMarketPriceForCommodity(
     }
   }
 
-  // 3. Fallback to authentic verified AGMARKNET benchmark
-  const benchmark = VERIFIED_AGMARKNET_PRICES.find(
-    (p) =>
-      p.marketId === marketId &&
-      p.commodity.toLowerCase() === normCommodity.toLowerCase()
+  // PRIORITY 2: Direct Authentic AGMARKNET Benchmark Quotation
+  const matchingBenchmarks = VERIFIED_AGMARKNET_PRICES.filter(
+    (p) => p.marketId === marketId && isCommodityMatch(p.commodity, normCommodity)
   );
 
-  if (benchmark) {
-    const freshness = evaluatePriceFreshness(benchmark.arrivalDate);
-    const resolvedRecord: MarketPriceRecord = {
-      ...benchmark,
-      freshnessStatus: freshness,
-    };
-    setCachedPrice(resolvedRecord);
-    return resolvedRecord;
+  if (matchingBenchmarks.length > 0) {
+    // Sort by arrivalDate descending
+    matchingBenchmarks.sort((a, b) => new Date(b.arrivalDate).getTime() - new Date(a.arrivalDate).getTime());
+    const latestBenchmark = matchingBenchmarks[0];
+
+    const validated = resolveValidatedPriceStatus({
+      record: {
+        ...latestBenchmark,
+        fallbackTier: 2,
+      },
+      isDemoBenchmark,
+      requestedCommodity: normCommodity,
+      targetMarketId: marketId,
+      targetMarketName: marketName,
+      targetDistrict: district,
+      targetState: state,
+    });
+
+    if (validated.isValid && validated.sanitizedRecord) {
+      setCachedPrice(validated.sanitizedRecord);
+      return validated.sanitizedRecord;
+    }
   }
 
-  // If no price is recorded for this commodity at this mandi, return null (honest unavailability)
+  // Check recent historical trading series
+  const historySeriesKey = `${marketId}_${normCommodity}`;
+  const historySeries = RECENT_PRICE_HISTORY_SERIES[historySeriesKey];
+  if (historySeries && historySeries.length > 0) {
+    const latestPoint = historySeries[historySeries.length - 1];
+    const validated = resolveValidatedPriceStatus({
+      record: {
+        marketId,
+        marketName,
+        state,
+        district,
+        commodity: normCommodity,
+        variety: 'FAQ / Standard',
+        grade: 'FAQ',
+        arrivalDate: latestPoint.date,
+        minPrice: latestPoint.minPrice,
+        maxPrice: latestPoint.maxPrice,
+        modalPrice: latestPoint.modalPrice,
+        source: 'AGMARKNET (Historical APMC Daily Series)',
+        fallbackTier: 2,
+      },
+      isDemoBenchmark,
+      requestedCommodity: normCommodity,
+      targetMarketId: marketId,
+      targetMarketName: marketName,
+    });
+
+    if (validated.isValid && validated.sanitizedRecord) {
+      setCachedPrice(validated.sanitizedRecord);
+      return validated.sanitizedRecord;
+    }
+  }
+
+  // PRIORITY 2.5: Multi-Source e-NAM, Agricultural Portals & Web Discovery
+  const webDiscovery = await searchWebForCropPrices(normCommodity, state, marketName, district);
+  const matchedWebQuote = webDiscovery.records.find((r) =>
+    r.marketId === marketId ||
+    isMarketIdentityMatch(r.marketId, r.marketName, r.district, r.state, marketId, marketName, district, state)
+  );
+  if (matchedWebQuote) {
+    setCachedPrice(matchedWebQuote);
+    return matchedWebQuote;
+  }
+
+  // PRIORITY 3: Latest Quotation for Same Crop in Nearby Verified Mandi
+  const currentMandiDef = getNationalMarketById(marketId);
+  const targetLat = currentMandiDef?.latitude;
+  const targetLng = currentMandiDef?.longitude;
+
+  if (targetLat !== undefined && targetLng !== undefined) {
+    const matchingNearbyQuotes = VERIFIED_AGMARKNET_PRICES.filter(
+      (p) => p.marketId !== marketId && isCommodityMatch(p.commodity, normCommodity)
+    );
+
+    if (matchingNearbyQuotes.length > 0) {
+      let bestRefQuote: MarketPriceRecord | null = null;
+      let minDistance = Infinity;
+
+      for (const quote of matchingNearbyQuotes) {
+        const refMandiDef = getNationalMarketById(quote.marketId);
+        if (refMandiDef) {
+          const dist = calculateHaversineDistance(
+            targetLat,
+            targetLng,
+            refMandiDef.latitude,
+            refMandiDef.longitude
+          );
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestRefQuote = quote;
+          }
+        }
+      }
+
+      if (bestRefQuote && (minDistance <= 350 || bestRefQuote.state === state)) {
+        const refDistanceKm = Math.round(minDistance * 10) / 10;
+        const validated = resolveValidatedPriceStatus({
+          record: {
+            marketId,
+            marketName,
+            state,
+            district,
+            commodity: normCommodity,
+            variety: bestRefQuote.variety,
+            grade: bestRefQuote.grade,
+            arrivalDate: bestRefQuote.arrivalDate,
+            minPrice: bestRefQuote.minPrice,
+            maxPrice: bestRefQuote.maxPrice,
+            modalPrice: bestRefQuote.modalPrice,
+            source: `Referenced from ${bestRefQuote.marketName} (${refDistanceKm} km away)`,
+            confidenceIndicator: 'MEDIUM',
+            attributedMarketName: bestRefQuote.marketName,
+            attributedDistanceKm: refDistanceKm,
+            fallbackTier: 3,
+          },
+          isDemoBenchmark,
+          requestedCommodity: normCommodity,
+          targetMarketId: marketId,
+          targetMarketName: marketName,
+        });
+
+        if (validated.isValid && validated.sanitizedRecord) {
+          setCachedPrice(validated.sanitizedRecord);
+          return validated.sanitizedRecord;
+        }
+      }
+    }
+  }
+
+  // PRIORITY 4: Regional District or State Benchmark Price
+  const stateBenchmarks = REGIONAL_STATE_BENCHMARKS[state] || REGIONAL_STATE_BENCHMARKS['All India'];
+  const stateCommodityBenchmark =
+    stateBenchmarks?.[normCommodity] || REGIONAL_STATE_BENCHMARKS['All India']?.[normCommodity];
+
+  if (stateCommodityBenchmark) {
+    const validated = resolveValidatedPriceStatus({
+      record: {
+        marketId,
+        marketName,
+        state,
+        district,
+        commodity: normCommodity,
+        variety: 'State FAQ Benchmark',
+        grade: 'FAQ',
+        arrivalDate: stateCommodityBenchmark.arrivalDate,
+        minPrice: stateCommodityBenchmark.minPrice,
+        maxPrice: stateCommodityBenchmark.maxPrice,
+        modalPrice: stateCommodityBenchmark.modalPrice,
+        source: stateCommodityBenchmark.source,
+        confidenceIndicator: 'LOW',
+        fallbackTier: 4,
+        priceSourceType: 'REGIONAL_BENCHMARK',
+      },
+      isDemoBenchmark,
+      requestedCommodity: normCommodity,
+      targetMarketId: marketId,
+      targetMarketName: marketName,
+    });
+
+    if (validated.isValid && validated.sanitizedRecord) {
+      setCachedPrice(validated.sanitizedRecord);
+      return validated.sanitizedRecord;
+    }
+  }
+
+  // PRIORITY 5: Farmer-Entered Expected Price (Demo Benchmarks Mode ONLY)
+  if (isDemoBenchmark && options.expectedPricePerQuintal && options.expectedPricePerQuintal > 0) {
+    const expPrice = Math.round(options.expectedPricePerQuintal);
+    const validated = resolveValidatedPriceStatus({
+      record: {
+        marketId,
+        marketName,
+        state,
+        district,
+        commodity: normCommodity,
+        variety: 'Farmer Stated Grade',
+        grade: 'Standard',
+        arrivalDate: new Date().toISOString().split('T')[0],
+        minPrice: Math.round(expPrice * 0.95),
+        maxPrice: Math.round(expPrice * 1.05),
+        modalPrice: expPrice,
+        source: 'Farmer Entered Expected Price',
+        confidenceIndicator: 'ESTIMATE',
+        fallbackTier: 5,
+      },
+      isDemoBenchmark,
+      requestedCommodity: normCommodity,
+      targetMarketId: marketId,
+      targetMarketName: marketName,
+    });
+
+    if (validated.isValid && validated.sanitizedRecord) {
+      return validated.sanitizedRecord;
+    }
+  }
+
+  // All 5 tiers failed: return null
   return null;
 }
 
+export interface NationalCommodityPriceDiscoveryResult {
+  records: MarketPriceRecord[];
+  discoveryLevel: DiscoveryLevel;
+  apiErrorCategory?: ApiErrorCategory;
+  rawError?: string;
+  totalFound: number;
+}
+
+/**
+ * PHASE 2 & 3: LOCATION-BASED COMMODITY PRICE DISCOVERY WITH 3-LEVEL NATIONAL EXPANSION
+ * Searches actual commodity-price records first across:
+ * Level 1 (Nearby): Farmer's home state and proximate trading yards
+ * Level 2 (Regional): Neighbouring state mandis
+ * Level 3 (National): National terminal hubs and wholesale trading yards across all Indian states/UTs
+ *
+ * Implements 30-day configurable lookback, exact commodity matching, and transparent error classification.
+ */
+export async function discoverNationalCommodityPrices(
+  commodity: string,
+  farmerState: string = 'Karnataka',
+  options?: {
+    apiKey?: string;
+    maxLookbackDays?: number;
+  }
+): Promise<NationalCommodityPriceDiscoveryResult> {
+  const normCommodity = normalizeCommodityForAgmarknet(commodity);
+  const maxLookbackDays = options?.maxLookbackDays || 30;
+  const cutoffTime = Date.now() - maxLookbackDays * 24 * 60 * 60 * 1000;
+  const keyToUse = getEnvApiKey(options?.apiKey);
+  const isDemoBenchmark = options?.apiKey === 'DEMO_BENCHMARK';
+
+  let discoveredApiRecords: Array<Record<string, string>> = [];
+  let apiErrorCategory: ApiErrorCategory | undefined;
+  let rawError: string | undefined;
+
+  // Step 1: Live AGMARKNET API Query across India for requested commodity
+  if (keyToUse && !isDemoBenchmark && typeof fetch !== 'undefined') {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+      const endpoint = `${DATA_GOV_IN_BASE_URL}/${DATA_GOV_IN_RESOURCE_ID}?api-key=${encodeURIComponent(
+        keyToUse
+      )}&format=json&limit=100&filters[commodity]=${encodeURIComponent(normCommodity)}`;
+
+      const response = await fetch(endpoint, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        lastApiStatus = {
+          isAvailable: true,
+          lastSyncTime: new Date().toISOString(),
+        };
+        const json = await response.json();
+        discoveredApiRecords = (json.records || []) as Array<Record<string, string>>;
+      } else {
+        if (response.status === 401 || response.status === 403) {
+          apiErrorCategory = 'AUTH_FAILURE';
+        } else if (response.status === 429) {
+          apiErrorCategory = 'RATE_LIMITED';
+        }
+        rawError = `AGMARKNET API error HTTP ${response.status}: ${response.statusText}`;
+        lastApiStatus = {
+          isAvailable: false,
+          lastError: rawError,
+          lastSyncTime: lastApiStatus.lastSyncTime,
+        };
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        apiErrorCategory = 'TIMEOUT';
+        rawError = 'AGMARKNET API request timed out after 7000ms';
+      } else {
+        apiErrorCategory = 'NETWORK_UNREACHABLE';
+        rawError = err instanceof Error ? err.message : 'Network communication error';
+      }
+      lastApiStatus = {
+        isAvailable: false,
+        lastError: rawError,
+        lastSyncTime: lastApiStatus.lastSyncTime,
+      };
+    }
+  }
+
+  // Parse live API records
+  const parsedLiveRecords: MarketPriceRecord[] = [];
+  for (const r of discoveredApiRecords) {
+    if (!r.market || !isCommodityMatch(r.commodity || '', normCommodity)) continue;
+    const arrDateStr = r.arrival_date || new Date().toISOString().split('T')[0];
+    const recTime = new Date(arrDateStr).getTime();
+    if (!isNaN(recTime) && recTime < cutoffTime) continue; // Exclude older than 30 days
+
+    const matchedMandi = VERIFIED_NATIONAL_MANDIS.find((nm) =>
+      isMarketIdentityMatch('', r.market, r.district || '', r.state || '', nm.marketId, nm.marketName, nm.district, nm.state)
+    );
+
+    const mId = matchedMandi
+      ? matchedMandi.marketId
+      : `agmarknet-${(r.state || 'in').toLowerCase().slice(0, 2)}-${(r.market || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
+    const validated = resolveValidatedPriceStatus({
+      record: {
+        marketId: mId,
+        marketName: matchedMandi ? matchedMandi.marketName : r.market,
+        state: r.state || '',
+        district: r.district || '',
+        commodity: normCommodity,
+        variety: r.variety || 'Standard FAQ',
+        grade: r.grade || 'FAQ',
+        arrivalDate: arrDateStr,
+        minPrice: parseFloat(r.min_price),
+        maxPrice: parseFloat(r.max_price),
+        modalPrice: parseFloat(r.modal_price),
+        source: 'Data.gov.in (Official AGMARKNET Live Feed)',
+        fallbackTier: 1,
+      },
+      isLiveApiResult: true,
+      requestedCommodity: normCommodity,
+      targetMarketId: mId,
+    });
+
+    if (validated.isValid && validated.sanitizedRecord) {
+      setCachedPrice(validated.sanitizedRecord);
+      parsedLiveRecords.push(validated.sanitizedRecord);
+    }
+  }
+
+  // Step 2: In Live Mode without API key, or as verified benchmark repository:
+  // Gather authentic AGMARKNET benchmark records within 30 days
+  const parsedBenchmarkRecords: MarketPriceRecord[] = [];
+  for (const b of VERIFIED_AGMARKNET_PRICES) {
+    if (isCommodityMatch(b.commodity, normCommodity)) {
+      const bTime = new Date(b.arrivalDate).getTime();
+      if (isNaN(bTime) || bTime >= cutoffTime) {
+        const validated = resolveValidatedPriceStatus({
+          record: { ...b, fallbackTier: 2 },
+          isDemoBenchmark,
+          requestedCommodity: normCommodity,
+          targetMarketId: b.marketId,
+        });
+        if (validated.isValid && validated.sanitizedRecord) {
+          setCachedPrice(validated.sanitizedRecord);
+          parsedBenchmarkRecords.push(validated.sanitizedRecord);
+        }
+      }
+    }
+  }
+
+  // Check historical trading series
+  for (const [key, series] of Object.entries(RECENT_PRICE_HISTORY_SERIES)) {
+    if (series.length > 0 && key.toLowerCase().includes(normCommodity.toLowerCase())) {
+      const latestPoint = series[series.length - 1];
+      const pTime = new Date(latestPoint.date).getTime();
+      if (isNaN(pTime) || pTime >= cutoffTime) {
+        const marketIdPart = key.split('_')[0];
+        const marketDef = getNationalMarketById(marketIdPart);
+        if (marketDef) {
+          const validated = resolveValidatedPriceStatus({
+            record: {
+              marketId: marketDef.marketId,
+              marketName: marketDef.marketName,
+              state: marketDef.state,
+              district: marketDef.district,
+              commodity: normCommodity,
+              variety: 'FAQ / Standard',
+              grade: 'FAQ',
+              arrivalDate: latestPoint.date,
+              minPrice: latestPoint.minPrice,
+              maxPrice: latestPoint.maxPrice,
+              modalPrice: latestPoint.modalPrice,
+              source: 'AGMARKNET (Historical APMC Daily Series)',
+              fallbackTier: 2,
+            },
+            isDemoBenchmark,
+            requestedCommodity: normCommodity,
+            targetMarketId: marketDef.marketId,
+          });
+          if (validated.isValid && validated.sanitizedRecord) {
+            parsedBenchmarkRecords.push(validated.sanitizedRecord);
+          }
+        }
+      }
+    }
+  }
+
+  // Step 3: Deduplicate all verified records by marketId (latest arrivalDate wins)
+  const allVerifiedRecordsMap = new Map<string, MarketPriceRecord>();
+  for (const rec of [...parsedBenchmarkRecords, ...parsedLiveRecords]) {
+    const existing = allVerifiedRecordsMap.get(rec.marketId);
+    if (!existing) {
+      allVerifiedRecordsMap.set(rec.marketId, rec);
+    } else {
+      const dateA = new Date(existing.arrivalDate).getTime();
+      const dateB = new Date(rec.arrivalDate).getTime();
+      if (dateB > dateA) {
+        allVerifiedRecordsMap.set(rec.marketId, rec);
+      }
+    }
+  }
+
+  // Step 3.5: Multi-source price discovery fallback (e-NAM, agricultural portals, web discovery)
+  // When official AGMARKNET yields 0 records for common crops (Cauliflower, Coriander, Moong, etc.):
+  if (allVerifiedRecordsMap.size === 0) {
+    const webDiscovery = await searchWebForCropPrices(normCommodity, farmerState);
+    if (webDiscovery.records.length > 0) {
+      for (const rec of webDiscovery.records) {
+        allVerifiedRecordsMap.set(rec.marketId, rec);
+      }
+    } else if (webDiscovery.apiErrorCategory) {
+      apiErrorCategory = webDiscovery.apiErrorCategory;
+    }
+  }
+
+  const allAvailableRecords = Array.from(allVerifiedRecordsMap.values());
+
+  // Step 4: Empty state handling (legitimate absence vs API technical error)
+  if (allAvailableRecords.length === 0) {
+    return {
+      records: [],
+      discoveryLevel: 'NATIONAL',
+      apiErrorCategory: apiErrorCategory || 'NO_LIVE_RECORDS',
+      rawError,
+      totalFound: 0,
+    };
+  }
+
+  // Step 5: Classify Discovery Level (Nearby vs Regional vs National)
+  const normState = (farmerState || 'Karnataka').trim().toLowerCase();
+  const neighborStates = (NEIGHBORING_STATES[farmerState] || []).map((s) => s.toLowerCase());
+
+  const level1LocalRecords = allAvailableRecords.filter(
+    (r) => r.state.trim().toLowerCase() === normState
+  );
+
+  const level2RegionalRecords = allAvailableRecords.filter((r) => {
+    const rState = r.state.trim().toLowerCase();
+    return rState === normState || neighborStates.includes(rState);
+  });
+
+  let discoveryLevel: DiscoveryLevel = 'NATIONAL';
+  if (level1LocalRecords.length >= 2) {
+    discoveryLevel = 'NEARBY';
+  } else if (level2RegionalRecords.length >= 2) {
+    discoveryLevel = 'REGIONAL';
+  } else {
+    discoveryLevel = 'NATIONAL';
+  }
+
+  return {
+    records: allAvailableRecords,
+    discoveryLevel,
+    apiErrorCategory,
+    rawError,
+    totalFound: allAvailableRecords.length,
+  };
+}

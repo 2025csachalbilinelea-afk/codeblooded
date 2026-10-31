@@ -5,9 +5,15 @@ import {
   MandiFilterOptions,
   MandiSortOption,
   PriceFreshnessStatus,
+  PriceSourceType,
+  PriceCategory,
+  InternalPriceStatus,
+  DiscoveryLevel,
+  ApiErrorCategory,
 } from '../../types/marketDiscovery';
 import { MarketLocationMap } from '../markets/MarketLocationMap';
 import { formatINR } from '../../utils/currency';
+import { auditAndEnforceConsistency } from '../../services/priceValidationService';
 import {
   Award,
   TrendingUp,
@@ -19,12 +25,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   Layers,
-  Map as MapIcon,
-  HelpCircle,
   Database,
-  ExternalLink,
-  ShieldCheck,
   ChevronRight,
+  Sparkles,
+  Globe,
+  ExternalLink,
+  Info,
+  X,
 } from 'lucide-react';
 
 interface DynamicMarketSectionProps {
@@ -40,6 +47,181 @@ interface DynamicMarketSectionProps {
   onSelectBreakdown: (mandi: DynamicMandiEvaluation) => void;
   isLiveMode: boolean;
   onToggleLiveMode: (live: boolean) => void;
+  apiStatus?: { isAvailable: boolean; lastError?: string; lastSyncTime?: string };
+  cropName?: string;
+  discoveryLevel?: DiscoveryLevel;
+  apiErrorCategory?: ApiErrorCategory;
+}
+
+/**
+ * PHASE 6, 7 & 8: HUMAN-READABLE PRICE SOURCE BADGES & PROVENANCE
+ * - Category A / Live: "Verified quotation" (Live / fresh direct APMC quote <= 2 days)
+ * - Category B / Historical: "Historical quotation" (Historical APMC quote > 2 days and <= 30 days)
+ * - Web-Discovered: "Web-discovered" / "Official e-NAM" (Multi-source agricultural discovery with provenance)
+ * - Category C: "Reference price" (Regional/State APMC reference price for planning)
+ * - Missing/Zero: "Price Unavailable"
+ */
+function renderPriceSourceBadge(
+  sourceType: PriceSourceType,
+  hasVerifiedPrice?: boolean,
+  modalPrice?: number,
+  fallbackTier?: 1 | 2 | 3 | 4 | 5,
+  attributedMarketName?: string,
+  priceCategory?: PriceCategory,
+  internalPriceStatus?: InternalPriceStatus,
+  sourceUrl?: string,
+  sourceName?: string,
+  onOpenProvenance?: () => void
+) {
+  let resolvedType = sourceType;
+
+  // Invariant 1: If numerical price is present, resolve away from UNAVAILABLE
+  if (hasVerifiedPrice && modalPrice && modalPrice > 0 && resolvedType === 'UNAVAILABLE') {
+    resolvedType = 'HISTORICAL';
+  }
+
+  // Invariant 2: If price is missing or 0, status must strictly be UNAVAILABLE
+  if ((!hasVerifiedPrice || !modalPrice || modalPrice <= 0) && resolvedType !== 'UNAVAILABLE') {
+    resolvedType = 'UNAVAILABLE';
+  }
+
+  // Web-Discovered Price (Tier 2 e-NAM, Tier 3 Portals, Tier 4 Web Search)
+  if (internalPriceStatus === 'WEB-DISCOVERED PRICE' || resolvedType === 'WEB_DISCOVERED') {
+    const isEnam = Boolean(sourceName?.toLowerCase().includes('enam'));
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenProvenance?.();
+        }}
+        className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300 hover:bg-sky-200 transition-colors cursor-pointer"
+        title="Click to view external quotation provenance and source URL"
+      >
+        <Globe className="w-3 h-3 text-sky-600" />
+        <span>{isEnam ? 'Official e-NAM' : 'Web-discovered'}</span>
+        <Info className="w-2.5 h-2.5 text-sky-500 ml-0.5 opacity-70" />
+      </button>
+    );
+  }
+
+  // Category A: Verified quotation (Live or fresh <= 2 days)
+  if (priceCategory === 'CATEGORY_A' || resolvedType === 'LIVE' || internalPriceStatus === 'LIVE OFFICIAL QUOTE') {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenProvenance?.();
+        }}
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200 transition-colors cursor-pointer"
+        title="Click to view AGMARKNET quotation provenance"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1 animate-pulse" />
+        <span>Verified quotation</span>
+        <Info className="w-2.5 h-2.5 text-emerald-600 ml-1 opacity-70" />
+      </button>
+    );
+  }
+
+  // Category B: Historical quotation (direct quote > 2 days <= 30 days)
+  if (priceCategory === 'CATEGORY_B' || resolvedType === 'HISTORICAL' || internalPriceStatus === 'HISTORICAL OFFICIAL QUOTE') {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenProvenance?.();
+        }}
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 hover:bg-indigo-200 transition-colors cursor-pointer"
+        title="Click to view AGMARKNET historical quotation provenance"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 mr-1" />
+        <span>Historical quotation</span>
+        <Info className="w-2.5 h-2.5 text-indigo-600 ml-1 opacity-70" />
+      </button>
+    );
+  }
+
+  // Category C: Reference price (Regional reference or State Benchmark)
+  if (
+    priceCategory === 'CATEGORY_C' ||
+    resolvedType === 'NEARBY_REFERENCE' ||
+    resolvedType === 'REGIONAL_BENCHMARK' ||
+    internalPriceStatus === 'REGIONAL REFERENCE PRICE'
+  ) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenProvenance?.();
+        }}
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer"
+        title={
+          attributedMarketName
+            ? `Regional reference price from ${attributedMarketName}`
+            : 'State/Regional APMC Reference Price'
+        }
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 mr-1" />
+        <span>Reference price</span>
+        <Info className="w-2.5 h-2.5 text-amber-600 ml-1 opacity-70" />
+      </button>
+    );
+  }
+
+  if (resolvedType === 'CACHED') {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenProvenance?.();
+        }}
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 hover:bg-indigo-200 transition-colors cursor-pointer"
+        title="Click to view quotation provenance"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 mr-1" />
+        <span>Historical quotation</span>
+        <Info className="w-2.5 h-2.5 text-indigo-600 ml-1 opacity-70" />
+      </button>
+    );
+  }
+
+  if (resolvedType === 'FARMER_EXPECTED') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-300">
+        <span className="w-1.5 h-1.5 rounded-full bg-teal-600 mr-1" />
+        Expected price
+      </span>
+    );
+  }
+
+  if (resolvedType === 'SAMPLE') {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenProvenance?.();
+        }}
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer"
+        title="Click to view benchmark details"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 mr-1" />
+        <span>Demo benchmark</span>
+        <Info className="w-2.5 h-2.5 text-amber-600 ml-1 opacity-70" />
+      </button>
+    );
+  }
+
+  // Unavailable / unquoted
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+      Price Unavailable
+    </span>
+  );
 }
 
 export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
@@ -55,11 +237,23 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
   onSelectBreakdown,
   isLiveMode,
   onToggleLiveMode,
+  apiStatus,
+  cropName,
+  discoveryLevel,
+  apiErrorCategory,
 }) => {
   const [viewTab, setViewTab] = useState<'cards' | 'table' | 'map'>('cards');
+  const [selectedProvenanceMandi, setSelectedProvenanceMandi] = useState<DynamicMandiEvaluation | null>(null);
+
+  // Pre-render consistency audit and automatic invariant healing
+  auditAndEnforceConsistency(evaluations);
 
   // Available unique states in current evaluated list
   const availableStates = Array.from(new Set(evaluations.map((e) => e.market.state))).sort();
+
+  const isApiDown = Boolean(apiStatus && apiStatus.isAvailable === false);
+  const quotedEvaluations = evaluations.filter((e) => e.hasVerifiedPrice);
+  const hasNoQuotedMandis = quotedEvaluations.length === 0;
 
   return (
     <div className="space-y-6">
@@ -67,10 +261,24 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
       <div className="bg-white rounded-3xl border border-rural-border shadow-rural-soft p-5 sm:p-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-rural-border/70 gap-4">
           <div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-3 py-0.5 rounded-full border border-emerald-300">
                 Phase 5 Dynamic Discovery
               </span>
+              <span className="text-xs text-rural-muted">•</span>
+              {discoveryLevel === 'NEARBY' ? (
+                <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                  Level 1: Nearby APMCs
+                </span>
+              ) : discoveryLevel === 'REGIONAL' ? (
+                <span className="text-[11px] font-bold text-indigo-800 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-300">
+                  Level 2: Regional Discovery
+                </span>
+              ) : (
+                <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300">
+                  Level 3: National Terminal Discovery
+                </span>
+              )}
               <span className="text-xs text-rural-muted">•</span>
               <span className="text-xs text-rural-forest font-semibold">
                 {totalCandidatesFound} Agricultural Mandis Discovered
@@ -142,19 +350,19 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                 }`}
                 title="Geographic Radar Map"
               >
-                <MapIcon className="w-4 h-4" />
+                <MapPin className="w-4 h-4" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Filter and Sort Toolbar */}
-        <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Filters and Sorting Controls */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4">
           {/* Sort By */}
           <div>
             <label className="block text-[11px] font-semibold text-rural-muted uppercase tracking-wider mb-1 flex items-center space-x-1">
               <ArrowUpDown className="w-3 h-3 text-rural-primary" />
-              <span>Rank Mandis By</span>
+              <span>Sort Mandis By</span>
             </label>
             <select
               value={sortOption}
@@ -230,18 +438,145 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
         </div>
       </div>
 
-      {/* 🏆 HERO CARD: Recommended Mandi */}
-      {recommendedMarket ? (
+      {hasNoQuotedMandis ? (
+        isApiDown ||
+        apiErrorCategory === 'AUTH_FAILURE' ||
+        apiErrorCategory === 'RATE_LIMITED' ||
+        apiErrorCategory === 'TAVILY_AUTH_FAILURE' ||
+        apiErrorCategory === 'TAVILY_RATE_LIMITED' ||
+        apiErrorCategory === 'TAVILY_API_ERROR' ||
+        apiErrorCategory === 'NETWORK_UNREACHABLE' ||
+        apiErrorCategory === 'SEARCH_API_NOT_CONFIGURED' ||
+        apiErrorCategory === 'TIMEOUT' ? (
+          /* Technical API error with specific category diagnostic */
+          <div className="bg-amber-50/90 border border-amber-300 rounded-3xl p-6 sm:p-7 shadow-sm text-amber-950 space-y-4">
+            <div className="flex items-start space-x-3.5">
+              <div className="p-2.5 rounded-2xl bg-amber-100 text-amber-800 border border-amber-200 shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5 text-amber-700" />
+              </div>
+              <div className="space-y-1">
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 mb-1">
+                  <span>API Diagnostic: {apiErrorCategory || 'COMMUNICATION_ERROR'}</span>
+                </div>
+                <h3 className="text-lg font-serif font-bold text-amber-950">
+                  {apiErrorCategory === 'TAVILY_AUTH_FAILURE'
+                    ? 'Tavily Search API Authentication Failure'
+                    : apiErrorCategory === 'TAVILY_RATE_LIMITED'
+                    ? 'Tavily Search API Rate Limit Exceeded'
+                    : apiErrorCategory === 'TAVILY_API_ERROR'
+                    ? 'Tavily Search API Error'
+                    : apiErrorCategory === 'AUTH_FAILURE'
+                    ? 'AGMARKNET API Authentication Failure'
+                    : apiErrorCategory === 'RATE_LIMITED'
+                    ? 'AGMARKNET API Rate Limit Exceeded'
+                    : apiErrorCategory === 'SEARCH_API_NOT_CONFIGURED'
+                    ? 'Backend Search Service Not Configured'
+                    : 'Government Market Price API Temporarily Unavailable'}
+                </h3>
+                <p className="text-xs sm:text-sm text-amber-900 leading-relaxed max-w-3xl">
+                  {apiErrorCategory === 'TAVILY_AUTH_FAILURE'
+                    ? 'Tavily rejected the configured TAVILY_API_KEY. Verify that the backend .env contains a valid key and restart the API server.'
+                    : apiErrorCategory === 'TAVILY_RATE_LIMITED'
+                    ? 'Tavily rejected the search because the API rate limit was reached. Wait before retrying.'
+                    : apiErrorCategory === 'TAVILY_API_ERROR'
+                    ? 'Tavily returned an unsuccessful response. Check the backend API diagnostic and try again.'
+                    : apiErrorCategory === 'AUTH_FAILURE'
+                    ? 'The configured API key for the Data.gov.in AGMARKNET feed is invalid, expired, or missing permissions. Please verify your API key in settings.'
+                    : apiErrorCategory === 'RATE_LIMITED'
+                    ? 'Hourly query quota for Data.gov.in agricultural API was reached. Please wait a few moments before re-querying.'
+                    : apiErrorCategory === 'SEARCH_API_NOT_CONFIGURED'
+                    ? 'Official AGMARKNET reported 0 quotations for this crop, and the backend search service (TAVILY_API_KEY) is not configured in your environment.'
+                    : 'The external Government of India AGMARKNET / Data.gov.in service is currently unreachable or experiencing connection timeouts. This is an external API communication interruption and does not indicate that your local mandis have no prices.'}
+                </p>
+                {apiStatus?.lastError && (
+                  <div className="text-[11px] font-mono bg-amber-100/70 p-2.5 rounded-xl text-amber-900 border border-amber-200 mt-2">
+                    Diagnostic: {apiStatus.lastError}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-amber-200 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-amber-800">
+                You can switch to Demo Benchmarks mode to view indicative state APMC historical modal rates.
+              </p>
+              <button
+                type="button"
+                onClick={() => onToggleLiveMode(false)}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer"
+              >
+                Switch to Demo Benchmarks
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Legitimate empty state after 3-level search across 30-day lookback */
+          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm text-slate-800 space-y-4">
+            <div className="flex items-start space-x-3.5">
+              <div className="p-2.5 rounded-2xl bg-slate-100 text-slate-700 border border-slate-300 shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5 text-slate-600" />
+              </div>
+              <div className="space-y-1">
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800 border border-slate-300 mb-1">
+                  <span>3-Level National Search Completed (30-Day Lookback)</span>
+                </div>
+                <h3 className="text-lg font-serif font-bold text-rural-forest">
+                  No Verified Market Quotations Found for {cropName || 'Selected Crop'}
+                </h3>
+                <p className="text-xs sm:text-sm text-rural-muted leading-relaxed max-w-3xl">
+                  A comprehensive search across Level 1 (Nearby District APMCs), Level 2 (Regional Neighbouring States), and Level 3 (National Terminal Wholesale Hubs) was conducted. No official AGMARKNET wholesale arrival records were reported for <strong>{cropName || 'this crop'}</strong> across Indian APMC mandis within the 30-day lookback window.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 space-y-2">
+              <span className="text-xs font-bold text-rural-forest uppercase tracking-wider block">
+                Farmer Guidance & Recommended Actions:
+              </span>
+              <ul className="text-xs space-y-1.5 text-rural-charcoal list-disc list-inside">
+                <li>
+                  Daily wholesale arrivals for this commodity may be off-season or not actively auctioned at APMC yards today.
+                </li>
+                <li>
+                  Check back during peak mandi auction hours (10:00 AM – 3:00 PM IST) when market secretaries upload daily modal arrivals.
+                </li>
+                <li>
+                  Try selecting a related agricultural commodity or staple crop from the crop selector.
+                </li>
+                <li>
+                  Toggle to <strong>Demo Benchmarks</strong> mode if you want to explore indicative economic models and transport calculations for planning.
+                </li>
+              </ul>
+            </div>
+          </div>
+        )
+      ) : (
+        <>
+          {/* 🏆 HERO CARD: Recommended Mandi */}
+          {recommendedMarket ? (
         <div className="bg-gradient-to-br from-rural-forest to-rural-deep text-white rounded-3xl p-6 sm:p-7 shadow-rural-soft border-2 border-rural-fresh/40 relative overflow-hidden">
-          {/* Subtle background ornamentation */}
           <div className="absolute right-0 top-0 w-96 h-96 bg-rural-fresh/5 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10">
             {/* Top Badge */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div className="inline-flex items-center space-x-2 bg-rural-mint text-rural-forest px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                <Award className="w-4 h-4 text-rural-primary" />
-                <span>🏆 Recommended Agricultural Market</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center space-x-2 bg-rural-mint text-rural-forest px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                  <Award className="w-4 h-4 text-rural-primary" />
+                  <span>🏆 Recommended Agricultural Market</span>
+                </div>
+                {renderPriceSourceBadge(
+                  recommendedMarket.priceSourceType,
+                  recommendedMarket.hasVerifiedPrice,
+                  recommendedMarket.priceRecord?.modalPrice,
+                  recommendedMarket.fallbackTier,
+                  recommendedMarket.attributedMarketName,
+                  recommendedMarket.priceCategory,
+                  recommendedMarket.internalPriceStatus,
+                  recommendedMarket.sourceUrl,
+                  recommendedMarket.priceRecord?.source,
+                  () => setSelectedProvenanceMandi(recommendedMarket)
+                )}
               </div>
 
               {recommendedMarket.additionalEarnings > 0 && (
@@ -324,6 +659,12 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                     <span className="text-[10px] text-rural-muted block">
                       {recommendedMarket.priceRecord?.arrivalDate}
                     </span>
+                    {recommendedMarket.forecast?.available && (
+                      <div className="mt-1 inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                        <Sparkles className="w-2.5 h-2.5 text-emerald-700" />
+                        <span>7d: ₹{recommendedMarket.forecast.forecasts.d7.predictedPrice}/Qtl</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -404,6 +745,8 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
               <tbody className="divide-y divide-rural-border/70 font-medium">
                 {evaluations.map((mandi) => {
                   const isRec = recommendedMarket?.market.marketId === mandi.market.marketId;
+                  const isDistanceAvailable = mandi.isDistanceVerified && mandi.route.routingStatus !== 'UNAVAILABLE' && mandi.route.roadDistanceKm > 0;
+
                   return (
                     <tr
                       key={mandi.market.marketId}
@@ -418,11 +761,25 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                           </span>
                           <div>
                             <div className="font-bold text-rural-charcoal">{mandi.market.marketName}</div>
-                            {isRec && (
-                              <span className="text-[10px] text-amber-700 font-bold">
-                                🏆 Top Choice
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {renderPriceSourceBadge(
+                                mandi.priceSourceType,
+                                mandi.hasVerifiedPrice,
+                                mandi.priceRecord?.modalPrice,
+                                mandi.fallbackTier,
+                                mandi.attributedMarketName,
+                                mandi.priceCategory,
+                                mandi.internalPriceStatus,
+                                mandi.sourceUrl,
+                                mandi.priceRecord?.source,
+                                () => setSelectedProvenanceMandi(mandi)
+                              )}
+                              {isRec && (
+                                <span className="text-[10px] text-amber-700 font-bold">
+                                  🏆 Top Choice
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -430,25 +787,47 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                         {mandi.market.district}, {mandi.market.state}
                       </td>
                       <td className="py-3 px-3">
-                        <div className="font-bold text-rural-charcoal">{mandi.route.roadDistanceKm} km</div>
-                        <div className="text-[10px] text-rural-muted">~{mandi.route.estimatedTravelTimeHours} hrs</div>
+                        {isDistanceAvailable ? (
+                          <>
+                            <div className="font-bold text-rural-charcoal">{mandi.route.roadDistanceKm} km</div>
+                            <div className="text-[10px] text-rural-muted">~{mandi.route.estimatedTravelTimeHours} hrs</div>
+                          </>
+                        ) : (
+                          <div className="text-[11px] text-rural-muted italic">Distance unavailable</div>
+                        )}
                       </td>
                       <td className="py-3 px-3">
-                        <div className="font-bold text-emerald-700">
-                          {mandi.priceRecord ? `₹${mandi.priceRecord.modalPrice}` : 'Unavailable'}
-                        </div>
-                        <div className="text-[10px] text-rural-muted">{mandi.priceRecord?.arrivalDate}</div>
+                        {mandi.hasVerifiedPrice && mandi.priceRecord && mandi.priceRecord.modalPrice > 0 ? (
+                          <>
+                            <div className="font-bold text-emerald-700">₹{mandi.priceRecord.modalPrice.toLocaleString('en-IN')}/Qtl</div>
+                            <div className="text-[10px] text-rural-muted">{mandi.priceRecord.arrivalDate || 'N/A'}</div>
+                          </>
+                        ) : (
+                          <div className="text-[11px] font-semibold text-rose-700">Price Unavailable</div>
+                        )}
                       </td>
-                      <td className="py-3 px-3">{formatINR(mandi.grossRevenue)}</td>
-                      <td className="py-3 px-3 text-rose-700">- {formatINR(mandi.transportCost)}</td>
-                      <td className="py-3 px-3 text-rose-700">- {formatINR(mandi.marketFees)}</td>
+                      <td className="py-3 px-3">
+                        {mandi.hasVerifiedPrice ? formatINR(mandi.grossRevenue) : <span className="text-rural-muted italic">Unquoted</span>}
+                      </td>
+                      <td className="py-3 px-3 text-rose-700">
+                        {isDistanceAvailable ? `- ${formatINR(mandi.transportCost)}` : <span className="text-rural-muted italic">Uncalculated</span>}
+                      </td>
+                      <td className="py-3 px-3 text-rose-700">
+                        {mandi.hasVerifiedPrice ? `- ${formatINR(mandi.marketFees)}` : '-'}
+                      </td>
                       <td className="py-3 px-4">
-                        <div className="font-serif font-bold text-rural-forest text-sm">
-                          {formatINR(mandi.netSellingRevenue)}
-                        </div>
-                        <div className="text-[10px] text-rural-muted">
-                          ₹{mandi.netRevenuePerQuintal}/Qtl
-                        </div>
+                        {mandi.hasVerifiedPrice ? (
+                          <>
+                            <div className="font-serif font-bold text-rural-forest text-sm">
+                              {formatINR(mandi.netSellingRevenue)}
+                            </div>
+                            <div className="text-[10px] text-rural-muted">
+                              ₹{mandi.netRevenuePerQuintal}/Qtl
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-rural-muted italic font-medium">Unquoted</div>
+                        )}
                       </td>
                       <td className="py-3 px-3">
                         <button
@@ -471,6 +850,7 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {evaluations.map((mandi) => {
             const isRec = recommendedMarket?.market.marketId === mandi.market.marketId;
+            const isDistanceAvailable = mandi.isDistanceVerified && mandi.route.routingStatus !== 'UNAVAILABLE' && mandi.route.roadDistanceKm > 0;
 
             return (
               <div
@@ -484,9 +864,23 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                 <div>
                   {/* Card Top Pill */}
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-bold text-rural-muted bg-rural-cream px-2 py-0.5 rounded-full border border-rural-border">
-                      Rank #{mandi.rank}
-                    </span>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-[11px] font-bold text-rural-muted bg-rural-cream px-2 py-0.5 rounded-full border border-rural-border">
+                        Rank #{mandi.rank}
+                      </span>
+                      {renderPriceSourceBadge(
+                        mandi.priceSourceType,
+                        mandi.hasVerifiedPrice,
+                        mandi.priceRecord?.modalPrice,
+                        mandi.fallbackTier,
+                        mandi.attributedMarketName,
+                        mandi.priceCategory,
+                        mandi.internalPriceStatus,
+                        mandi.sourceUrl,
+                        mandi.priceRecord?.source,
+                        () => setSelectedProvenanceMandi(mandi)
+                      )}
+                    </div>
                     {isRec ? (
                       <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300 flex items-center space-x-1">
                         <Award className="w-3 h-3 text-amber-600" />
@@ -496,9 +890,13 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                       <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">
                         Feasible APMC
                       </span>
-                    ) : (
+                    ) : !mandi.hasVerifiedPrice ? (
                       <span className="text-[10px] font-semibold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-full">
-                        Quota Exceeded
+                        Price Unquoted
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full">
+                        Infeasible Quota
                       </span>
                     )}
                   </div>
@@ -521,7 +919,7 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                         Road Distance
                       </span>
                       <span className="font-bold text-rural-charcoal">
-                        {mandi.route.roadDistanceKm} km
+                        {isDistanceAvailable ? `${mandi.route.roadDistanceKm} km` : 'Distance unavailable'}
                       </span>
                     </div>
                     <div>
@@ -529,7 +927,7 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                         Est. Travel Time
                       </span>
                       <span className="font-bold text-rural-charcoal">
-                        ~{mandi.route.estimatedTravelTimeHours} hrs
+                        {isDistanceAvailable ? `~${mandi.route.estimatedTravelTimeHours} hrs` : 'Time unavailable'}
                       </span>
                     </div>
                   </div>
@@ -541,28 +939,51 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                         Daily Modal Price
                       </span>
                       <span className="font-bold text-emerald-700 text-sm">
-                        {mandi.priceRecord
-                          ? `₹${mandi.priceRecord.modalPrice}/Qtl`
+                        {mandi.hasVerifiedPrice && mandi.priceRecord && mandi.priceRecord.modalPrice > 0
+                          ? `₹${mandi.priceRecord.modalPrice.toLocaleString('en-IN')}/Qtl`
                           : 'Price Unavailable'}
                       </span>
                     </div>
                     <div className="text-right">
                       <span className="text-[10px] text-rural-muted block">Arrival Date</span>
                       <span className="text-[11px] font-semibold text-rural-charcoal">
-                        {mandi.priceRecord?.arrivalDate || 'N/A'}
+                        {mandi.hasVerifiedPrice && mandi.priceRecord?.arrivalDate && mandi.priceRecord.arrivalDate !== 'N/A'
+                          ? mandi.priceRecord.arrivalDate
+                          : 'N/A'}
                       </span>
+                      {mandi.forecast?.available && (
+                        <span className="inline-block mt-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
+                          7d: ₹{mandi.forecast.forecasts.d7.predictedPrice}
+                        </span>
+                      )}
                     </div>
                   </div>
+
+                  {mandi.forecast?.available && mandi.forecast.forecasts && (
+                    <div className="mt-2 flex items-center justify-between bg-emerald-50/70 border border-emerald-200/80 rounded-xl px-2.5 py-1 text-[11px]">
+                      <span className="text-emerald-800 font-semibold flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-emerald-600" />
+                        <span>7d ML Forecast:</span>
+                      </span>
+                      <span className="font-bold text-emerald-900">
+                        ₹{mandi.forecast.forecasts.d7.predictedPrice}/Qtl ({mandi.forecast.forecasts.d7.priceDeltaVsCurrent >= 0 ? '+' : ''}{mandi.forecast.forecasts.d7.priceDeltaVsCurrent}₹)
+                      </span>
+                    </div>
+                  )}
 
                   {/* Financial Metrics */}
                   <div className="mt-3 space-y-1 text-xs">
                     <div className="flex justify-between text-rural-muted">
                       <span>Transport Expense:</span>
-                      <span className="font-medium text-rose-700">- {formatINR(mandi.transportCost)}</span>
+                      <span className="font-medium text-rose-700">
+                        {isDistanceAvailable ? `- ${formatINR(mandi.transportCost)}` : 'Uncalculated'}
+                      </span>
                     </div>
                     <div className="flex justify-between text-rural-muted">
                       <span>Mandi Hamali & Fees:</span>
-                      <span className="font-medium text-rose-700">- {formatINR(mandi.marketFees)}</span>
+                      <span className="font-medium text-rose-700">
+                        {mandi.hasVerifiedPrice ? `- ${formatINR(mandi.marketFees)}` : '-'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -575,11 +996,15 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
                         Est. Net Take-Home
                       </span>
                       <div className="text-xl font-serif font-bold text-rural-forest">
-                        {formatINR(mandi.netSellingRevenue)}
+                        {mandi.hasVerifiedPrice ? (
+                          formatINR(mandi.netSellingRevenue)
+                        ) : (
+                          <span className="text-sm font-sans text-rural-muted italic">Price Unquoted</span>
+                        )}
                       </div>
                     </div>
                     <span className="text-xs font-semibold text-rural-primary">
-                      ₹{mandi.netRevenuePerQuintal}/Qtl
+                      {mandi.hasVerifiedPrice ? `₹${mandi.netRevenuePerQuintal}/Qtl` : 'Requires spot quotation'}
                     </span>
                   </div>
 
@@ -597,7 +1022,142 @@ export const DynamicMarketSection: React.FC<DynamicMarketSectionProps> = ({
           })}
         </div>
       )}
+        </>
+      )}
+
+      {/* Quotation Source & Verification Provenance Modal */}
+      {selectedProvenanceMandi && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-rural-border w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150 font-sans">
+            {/* Modal Header */}
+            <div className="bg-rural-forest text-white p-5 flex items-start justify-between">
+              <div>
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rural-mint text-rural-forest mb-1.5">
+                  <Globe className="w-3 h-3 text-rural-primary" />
+                  <span>Quotation Source & Verification</span>
+                </div>
+                <h3 className="text-lg font-serif font-bold text-white">
+                  {selectedProvenanceMandi.market.marketName}
+                </h3>
+                <p className="text-xs text-rural-mint/80">
+                  {selectedProvenanceMandi.market.district}, {selectedProvenanceMandi.market.state}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedProvenanceMandi(null)}
+                className="p-1.5 rounded-xl bg-rural-deep text-white/80 hover:text-white transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 text-xs text-rural-charcoal">
+              <div className="grid grid-cols-2 gap-3 bg-rural-cream p-3 rounded-2xl border border-rural-border">
+                <div>
+                  <span className="text-[10px] text-rural-muted uppercase font-bold tracking-wider block">
+                    Quotation Status
+                  </span>
+                  <span className="font-bold text-rural-forest text-xs mt-0.5 block">
+                    {selectedProvenanceMandi.internalPriceStatus || 'VERIFIED QUOTE'}
+                  </span>
+                  <span className="text-[10px] text-rural-muted block">
+                    {selectedProvenanceMandi.priceCategory ? `Category: ${selectedProvenanceMandi.priceCategory}` : ''}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-rural-muted uppercase font-bold tracking-wider block">
+                    Quotation Date
+                  </span>
+                  <span className="font-bold text-rural-forest text-xs mt-0.5 block">
+                    {selectedProvenanceMandi.priceRecord?.arrivalDate || 'N/A'}
+                  </span>
+                  <span className="text-[10px] text-rural-muted block">
+                    Freshness: {selectedProvenanceMandi.priceRecord?.freshnessStatus || 'CURRENT'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Pricing details */}
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[10px] text-emerald-800 uppercase font-bold tracking-wider block">
+                  Reported Wholesale Rate
+                </span>
+                <div className="flex items-baseline space-x-2">
+                  <span className="text-2xl font-serif font-bold text-emerald-900">
+                    ₹{selectedProvenanceMandi.priceRecord?.modalPrice?.toLocaleString('en-IN') || 0}/Qtl
+                  </span>
+                  {selectedProvenanceMandi.priceRecord?.minPrice && selectedProvenanceMandi.priceRecord?.maxPrice && (
+                    <span className="text-xs text-emerald-700">
+                      (Range: ₹{selectedProvenanceMandi.priceRecord.minPrice.toLocaleString('en-IN')} - ₹{selectedProvenanceMandi.priceRecord.maxPrice.toLocaleString('en-IN')})
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-emerald-800 block">
+                  Crop: {selectedProvenanceMandi.priceRecord?.commodity || 'Standard Produce'} • Variety: {selectedProvenanceMandi.priceRecord?.variety || 'FAQ'}
+                </span>
+              </div>
+
+              {/* Provenance Description */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] text-rural-muted uppercase font-bold tracking-wider block">
+                  Source & Provenance
+                </span>
+                <div className="p-3 bg-rural-cream rounded-xl border border-rural-border space-y-1">
+                  <div className="font-bold text-rural-forest">
+                    {selectedProvenanceMandi.priceRecord?.source || 'Verified APMC Bulletin'}
+                  </div>
+                  <p className="text-[11px] text-rural-muted leading-relaxed">
+                    {selectedProvenanceMandi.internalPriceStatus === 'WEB-DISCOVERED PRICE'
+                      ? 'Discovered via agricultural market price discovery from verified national trading portals or electronic mandi networks (e-NAM / CommodityOnline / Krishi Jagran) with structured price and date extraction.'
+                      : selectedProvenanceMandi.internalPriceStatus === 'LIVE OFFICIAL QUOTE'
+                      ? 'Directly retrieved from the Government of India AGMARKNET daily wholesale arrivals feed via Data.gov.in official API.'
+                      : selectedProvenanceMandi.internalPriceStatus === 'HISTORICAL OFFICIAL QUOTE'
+                      ? 'Official APMC yard daily trading record retrieved from historical government arrivals bulletin within the past 30 days.'
+                      : 'Regional reference price calibrated for transport planning and comparative profit analysis.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Source URL if available */}
+              {selectedProvenanceMandi.sourceUrl && (
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] text-rural-muted uppercase font-bold tracking-wider block">
+                    Verified Source Link
+                  </span>
+                  <div className="flex items-center justify-between p-2.5 bg-rural-cream rounded-xl border border-rural-border gap-2">
+                    <span className="text-[11px] font-mono text-rural-muted truncate max-w-xs">
+                      {selectedProvenanceMandi.sourceUrl}
+                    </span>
+                    <a
+                      href={selectedProvenanceMandi.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rural-forest text-white hover:bg-rural-deep text-xs font-semibold shrink-0 transition-colors cursor-pointer"
+                    >
+                      <span>Open Source</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-rural-cream p-3 px-5 border-t border-rural-border flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedProvenanceMandi(null)}
+                className="px-5 py-2 bg-rural-forest hover:bg-rural-deep text-white font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-

@@ -12,12 +12,31 @@ import {
   MandiSortOption,
   NationalMarket,
   RoadRouteResult,
+  PriceSourceType,
+  PriceCategory,
+  DiscoveryLevel,
+  ApiErrorCategory,
+  MarketPriceRecord,
 } from '../types/marketDiscovery';
-import { discoverNearbyNationalMandis } from '../data/nationalMandis';
-import { getMarketPriceForCommodity } from '../services/agmarknetService';
+import {
+  discoverNearbyNationalMandis,
+  getNationalMarketById,
+  VERIFIED_NATIONAL_MANDIS,
+} from '../data/nationalMandis';
+import {
+  getMarketPriceForCommodity,
+  getAgmarknetApiStatus,
+  discoverNationalCommodityPrices,
+} from '../services/agmarknetService';
+import {
+  resolveValidatedPriceStatus,
+  auditAndEnforceConsistency,
+  isMarketIdentityMatch,
+} from '../services/priceValidationService';
 import { calculateRoadRoute } from '../services/routingService';
 import { calculateTransportationCost } from './transport';
 import { calculateSpoilagePercentage } from './spoilage';
+import { generateCropPriceForecast } from './forecastEngine';
 
 export interface DiscoveryEngineResult {
   evaluatedMarkets: DynamicMandiEvaluation[];
@@ -26,6 +45,9 @@ export interface DiscoveryEngineResult {
   recommendedMarket: DynamicMandiEvaluation | null;
   closestFeasibleMarket: DynamicMandiEvaluation | null;
   totalCandidatesFound: number;
+  discoveryLevel?: DiscoveryLevel;
+  apiErrorCategory?: ApiErrorCategory;
+  apiStatus?: { isAvailable: boolean; lastError?: string; lastSyncTime?: string };
   searchSummary: {
     originAddress: string;
     cropName: string;
@@ -62,11 +84,32 @@ export function evaluateMarketCandidate(
     );
   }
 
-  // Feasibility Check 2: Price availability
-  const modalPrice = (priceRecord as any)?.modalPrice ?? 0;
-  if (!priceRecord || modalPrice <= 0) {
+  // Feasibility Check 2: Centralized price availability verification
+  const priceStatus = resolveValidatedPriceStatus({
+    record: priceRecord as any,
+    requestedCommodity: crop.name,
+    targetMarketId: market.marketId,
+    targetMarketName: market.marketName,
+    targetDistrict: market.district,
+    targetState: market.state,
+  });
+
+  const hasVerifiedPrice = priceStatus.hasVerifiedPrice;
+  const modalPrice = priceStatus.modalPrice;
+  const priceSourceType: PriceSourceType = priceStatus.priceSourceType;
+  const priceCategory: PriceCategory = priceStatus.priceCategory;
+  const sanitizedPriceRecord = priceStatus.sanitizedRecord;
+  const isDistanceVerified = Boolean(route.isDistanceVerified ?? (route.routingStatus === 'ROUTED'));
+
+  if (!hasVerifiedPrice) {
     infeasibilityReasons.push(
       'Daily wholesale price currently unavailable for this crop at this mandi.'
+    );
+  }
+
+  if (!isDistanceVerified || route.routingStatus === 'UNAVAILABLE') {
+    infeasibilityReasons.push(
+      'Road distance currently unavailable from your farm origin to this market.'
     );
   }
 
@@ -74,7 +117,7 @@ export function evaluateMarketCandidate(
   const spoilageCalc = calculateSpoilagePercentage(
     crop,
     spoilage,
-    route.estimatedTravelTimeHours,
+    route.estimatedTravelTimeHours || 1,
     market.typicalWaitHours,
     maturity
   );
@@ -82,34 +125,36 @@ export function evaluateMarketCandidate(
   const spoilageLossQuintals = Math.round(((quantityQuintals * spoilagePercent) / 100) * 100) / 100;
   const saleableQuintals = Math.max(0, Math.round((quantityQuintals - spoilageLossQuintals) * 100) / 100);
 
-  // Calculate Gross Revenue
-  const grossRevenue = Math.round(saleableQuintals * modalPrice);
+  // Calculate Gross Revenue - ONLY when verified price is available!
+  const grossRevenue = hasVerifiedPrice ? Math.round(saleableQuintals * modalPrice) : 0;
 
   // Calculate Transport Costs using authentic road distance
   const transportCalc = calculateTransportationCost(transport, route.roadDistanceKm, quantityQuintals);
-  const transportCost = transportCalc.totalCost;
+  const transportCost = isDistanceVerified ? transportCalc.totalCost : 0;
   const transportTrips = transportCalc.tripsCount;
 
-  if (!transportCalc.isFeasible && transportCalc.feasibilityReason) {
+  if (isDistanceVerified && !transportCalc.isFeasible && transportCalc.feasibilityReason) {
     infeasibilityReasons.push(transportCalc.feasibilityReason);
   }
 
   // Calculate Mandi Fees & Charges
-  const commissionFee = Math.round((market.commissionPercent / 100) * grossRevenue);
-  const cessFee = Math.round((market.cessPercent / 100) * grossRevenue);
+  const commissionFee = hasVerifiedPrice ? Math.round((market.commissionPercent / 100) * grossRevenue) : 0;
+  const cessFee = hasVerifiedPrice ? Math.round((market.cessPercent / 100) * grossRevenue) : 0;
   const handlingFee = Math.round(market.handlingChargePerQuintal * saleableQuintals);
   const totalMarketFees = commissionFee + cessFee + handlingFee + market.fixedEntryFee;
 
   // Calculate Total Selling Costs and Net Revenue
+  // Crucial Rule: Do not assign misleading profits when price or distance information is unavailable!
   const totalSellingCosts = transportCost + totalMarketFees;
-  const netSellingRevenue = grossRevenue - totalSellingCosts;
-  const netRevenuePerQuintal = quantityQuintals > 0 ? Math.round(netSellingRevenue / quantityQuintals) : 0;
+  const canCalculateNetRevenue = hasVerifiedPrice && isDistanceVerified;
+  const netSellingRevenue = canCalculateNetRevenue ? grossRevenue - totalSellingCosts : 0;
+  const netRevenuePerQuintal = canCalculateNetRevenue && quantityQuintals > 0 ? Math.round(netSellingRevenue / quantityQuintals) : 0;
 
   const isFeasible = infeasibilityReasons.length === 0;
 
   return {
     market,
-    priceRecord: priceRecord as any,
+    priceRecord: sanitizedPriceRecord,
     route,
     consignmentQuintals: quantityQuintals,
     saleableQuintals,
@@ -129,6 +174,28 @@ export function evaluateMarketCandidate(
     rank: 0,
     isRecommended: false,
     recommendationReasons: [],
+    hasVerifiedPrice,
+    priceSourceType,
+    priceCategory,
+    internalPriceStatus: priceStatus.internalPriceStatus,
+    sourceUrl: priceStatus.sourceUrl || sanitizedPriceRecord?.sourceUrl,
+    isDistanceVerified,
+    confidenceIndicator: priceStatus.confidenceIndicator,
+    attributedMarketName: priceStatus.attributedMarketName,
+    attributedDistanceKm: priceStatus.attributedDistanceKm,
+    fallbackTier: priceStatus.fallbackTier,
+    forecast:
+      hasVerifiedPrice
+        ? generateCropPriceForecast({
+            commodity: crop.name,
+            variety: sanitizedPriceRecord?.variety || 'Standard FAQ',
+            marketId: market.marketId,
+            marketName: market.marketName,
+            latestActualPrice: modalPrice,
+            latestArrivalDate: sanitizedPriceRecord?.arrivalDate,
+            freshnessStatus: sanitizedPriceRecord?.freshnessStatus || 'CURRENT',
+          })
+        : null,
   };
 }
 
@@ -151,33 +218,101 @@ export async function discoverAndEvaluateMandis(
   const sortOption = options?.sortOption || 'netRevenue';
   const filters = options?.filters || {};
 
-  // 1. Discover Candidate Mandis near farmer
-  const candidateMandis = discoverNearbyNationalMandis(
+  // 1. PHASE 3: Search actual commodity-price records first across India with 3-level expansion
+  const nationalDiscovery = await discoverNationalCommodityPrices(
+    crop.name,
+    farmerLocation.state,
+    {
+      apiKey: options?.apiKey,
+      maxLookbackDays: 30,
+    }
+  );
+
+  // Map of marketId -> discovered MarketPriceRecord
+  const priceRecordMap = new Map<string, MarketPriceRecord>();
+  for (const pr of nationalDiscovery.records) {
+    priceRecordMap.set(pr.marketId, pr);
+  }
+
+  // Derive candidate markets from discovered price records
+  const candidatesFromPrices: NationalMarket[] = [];
+  for (const pr of nationalDiscovery.records) {
+    let mDef = getNationalMarketById(pr.marketId);
+    if (!mDef) {
+      mDef = VERIFIED_NATIONAL_MANDIS.find((vm) =>
+        isMarketIdentityMatch('', pr.marketName, pr.district, pr.state, vm.marketId, vm.marketName, vm.district, vm.state)
+      );
+    }
+    if (mDef) {
+      candidatesFromPrices.push(mDef);
+    } else {
+      candidatesFromPrices.push({
+        marketId: pr.marketId,
+        marketName: pr.marketName,
+        state: pr.state,
+        district: pr.district,
+        latitude: farmerLocation.latitude,
+        longitude: farmerLocation.longitude,
+        source: pr.source,
+        sourceMarketIdentifier: pr.marketId,
+        lastVerifiedAt: pr.arrivalDate,
+        supportedCommodities: [crop.id, 'vegetables', 'pulses', 'grains'],
+        maxDailyCapacityQuintals: 500,
+        minPurchaseQuintals: 2,
+        commissionPercent: 1.5,
+        cessPercent: 0.8,
+        handlingChargePerQuintal: 20,
+        fixedEntryFee: 80,
+        typicalWaitHours: 2.0,
+      });
+    }
+  }
+
+  // Also include proximate local mandis near farmer for baseline comparison
+  const nearbyMandis = discoverNearbyNationalMandis(
     farmerLocation.latitude,
     farmerLocation.longitude,
     crop.id,
-    { targetCount: 12, maxRadiusKm: filters.maxDistanceKm || 1200 }
+    { targetCount: 8, maxRadiusKm: filters.maxDistanceKm || 1200 }
   );
 
-  // 2. Fetch routes and market prices in parallel
-  const evaluationPromises = candidateMandis.map(async ({ market }) => {
-    // Route calculation (OSRM with caching)
+  // Combine and deduplicate candidates
+  const uniqueCandidateMap = new Map<string, NationalMarket>();
+  for (const m of candidatesFromPrices) {
+    uniqueCandidateMap.set(m.marketId.trim().toLowerCase(), m);
+  }
+  for (const { market } of nearbyMandis) {
+    const key = market.marketId.trim().toLowerCase();
+    if (!uniqueCandidateMap.has(key)) {
+      uniqueCandidateMap.set(key, market);
+    }
+  }
+
+  const uniqueCandidates = Array.from(uniqueCandidateMap.values());
+
+  // 2. Fetch routes and market prices in parallel with market identity tracking
+  const evaluationPromises = uniqueCandidates.map(async (market) => {
+    // Route calculation (OSRM with collision-free caching and marketId)
     const route = await calculateRoadRoute(
       farmerLocation.latitude,
       farmerLocation.longitude,
       market.latitude,
-      market.longitude
+      market.longitude,
+      { marketId: market.marketId }
     );
 
-    // AGMARKNET Price calculation (Live + Cached + Verified Benchmarks)
-    const priceRecord = await getMarketPriceForCommodity(
-      market.marketId,
-      market.marketName,
-      market.state,
-      market.district,
-      crop.name,
-      options?.apiKey
-    );
+    // AGMARKNET Price calculation: use discovered record if available, else resolve
+    let priceRecord = priceRecordMap.get(market.marketId) || null;
+    if (!priceRecord) {
+      priceRecord = await getMarketPriceForCommodity(
+        market.marketId,
+        market.marketName,
+        market.state,
+        market.district,
+        crop.name,
+        options?.apiKey
+      );
+    }
 
     return evaluateMarketCandidate(
       market,
@@ -193,17 +328,28 @@ export async function discoverAndEvaluateMandis(
 
   const rawEvaluations = await Promise.all(evaluationPromises);
 
-  // 3. Identify Reference Baseline (closest feasible market by road distance)
-  const feasibleOnly = rawEvaluations.filter((m) => m.isFeasible);
+  // 3. Identify Reference Baseline (closest feasible market with Category A or B verified price by road distance)
+  const feasibleWithVerifiedQuote = rawEvaluations.filter(
+    (m) =>
+      m.isFeasible &&
+      m.hasVerifiedPrice &&
+      (m.priceCategory === 'CATEGORY_A' || m.priceCategory === 'CATEGORY_B')
+  );
+
   const closestFeasible =
-    feasibleOnly.length > 0
-      ? [...feasibleOnly].sort((a, b) => a.route.roadDistanceKm - b.route.roadDistanceKm)[0]
+    feasibleWithVerifiedQuote.length > 0
+      ? [...feasibleWithVerifiedQuote].sort((a, b) => a.route.roadDistanceKm - b.route.roadDistanceKm)[0]
       : null;
 
   // 4. Calculate additional earnings over closest local reference
   const evaluatedWithEarnings = rawEvaluations.map((evalItem) => {
     const baselineNet = closestFeasible ? closestFeasible.netSellingRevenue : 0;
-    const additional = evalItem.isFeasible ? evalItem.netSellingRevenue - baselineNet : 0;
+    const additional =
+      evalItem.isFeasible &&
+      evalItem.hasVerifiedPrice &&
+      (evalItem.priceCategory === 'CATEGORY_A' || evalItem.priceCategory === 'CATEGORY_B')
+        ? evalItem.netSellingRevenue - baselineNet
+        : 0;
     return {
       ...evalItem,
       additionalEarnings: additional,
@@ -224,20 +370,33 @@ export async function discoverAndEvaluateMandis(
     if (filters.onlyFeasible && !item.isFeasible) {
       return false;
     }
-    if (filters.minFreshness && filters.minFreshness !== 'ALL') {
+    const freshnessMode = filters.minFreshness || 'ALL';
+    if (freshnessMode === 'CURRENT') {
+      if (!item.hasVerifiedPrice || item.priceRecord?.freshnessStatus !== 'CURRENT') return false;
+    } else if (freshnessMode === 'RECENT') {
       const status = item.priceRecord?.freshnessStatus;
-      if (filters.minFreshness === 'CURRENT' && status !== 'CURRENT') return false;
-      if (filters.minFreshness === 'RECENT' && status !== 'CURRENT' && status !== 'RECENT') return false;
+      if (!item.hasVerifiedPrice || (status !== 'CURRENT' && status !== 'RECENT')) return false;
+    } else if (freshnessMode === 'ALL') {
+      if (!item.hasVerifiedPrice) return false;
     }
     return true;
   });
 
-  // 6. Sort Candidates
+  // 6. Sort Candidates: Feasible with verified quotes (Cat A & B) first, then Cat C, then by selected option
   filtered.sort((a, b) => {
-    // Keep feasible ahead of infeasible
     if (a.isFeasible !== b.isFeasible) {
       return a.isFeasible ? -1 : 1;
     }
+
+    const catScore = (item: DynamicMandiEvaluation) => {
+      if (!item.hasVerifiedPrice) return 0;
+      if (item.priceCategory === 'CATEGORY_A') return 3;
+      if (item.priceCategory === 'CATEGORY_B') return 2;
+      if (item.priceCategory === 'CATEGORY_C') return 1;
+      return 1;
+    };
+    const diffCat = catScore(b) - catScore(a);
+    if (diffCat !== 0) return diffCat;
 
     switch (sortOption) {
       case 'cropPrice': {
@@ -256,14 +415,19 @@ export async function discoverAndEvaluateMandis(
   });
 
   // 7. Assign Ranks and determine Top Recommendation
-  const feasibleList = filtered.filter((m) => m.isFeasible);
-  const infeasibleList = filtered.filter((m) => !m.isFeasible);
+  // CRUCIAL RULE (PHASE 6): Only Categories A and B may be used for market-specific revenue ranking!
+  // Category C is for indicative reference only and NEVER recommended.
+  const eligibleForRecommendation = filtered.filter(
+    (m) =>
+      m.isFeasible &&
+      m.hasVerifiedPrice &&
+      (m.priceCategory === 'CATEGORY_A' || m.priceCategory === 'CATEGORY_B')
+  );
 
   let recommendedMarket: DynamicMandiEvaluation | null = null;
 
-  // The recommended market is the feasible market with the highest net selling revenue
-  if (feasibleList.length > 0) {
-    const highestNet = [...feasibleList].sort((a, b) => b.netSellingRevenue - a.netSellingRevenue)[0];
+  if (eligibleForRecommendation.length > 0) {
+    const highestNet = [...eligibleForRecommendation].sort((a, b) => b.netSellingRevenue - a.netSellingRevenue)[0];
     recommendedMarket = highestNet;
 
     // Generate clear farmer recommendation rationale
@@ -290,9 +454,16 @@ export async function discoverAndEvaluateMandis(
       );
     }
 
-    if (highestNet.priceRecord) {
+    if (highestNet.route.roadDistanceKm > 500) {
       reasons.push(
-        `Verified modal rate of ₹${highestNet.priceRecord.modalPrice}/Qtl reported on ${highestNet.priceRecord.arrivalDate} (${highestNet.priceRecord.source}).`
+        `Inter-state transit notice (${highestNet.route.roadDistanceKm} km): High market rates offset travel expenses; coordinate dispatch or cold transport to minimize transit spoilage.`
+      );
+    }
+
+    if (highestNet.priceRecord) {
+      const catLabel = highestNet.priceCategory === 'CATEGORY_A' ? 'Verified quotation' : 'Historical quotation';
+      reasons.push(
+        `${catLabel}: Modal rate of ₹${highestNet.priceRecord.modalPrice}/Qtl reported on ${highestNet.priceRecord.arrivalDate} (${highestNet.priceRecord.source}).`
       );
     }
 
@@ -304,12 +475,15 @@ export async function discoverAndEvaluateMandis(
     highestNet.recommendationReasons = reasons;
   }
 
-  // Assign ranks
+  // Assign ranks: sequential numbering
   const rankedEvaluations = filtered.map((item, idx) => ({
     ...item,
     rank: idx + 1,
     isRecommended: recommendedMarket?.market.marketId === item.market.marketId,
   }));
+
+  // Enforce pre-render consistency
+  auditAndEnforceConsistency(rankedEvaluations);
 
   return {
     evaluatedMarkets: rankedEvaluations,
@@ -317,7 +491,10 @@ export async function discoverAndEvaluateMandis(
     infeasibleMarkets: rankedEvaluations.filter((m) => !m.isFeasible),
     recommendedMarket,
     closestFeasibleMarket: closestFeasible,
-    totalCandidatesFound: candidateMandis.length,
+    totalCandidatesFound: uniqueCandidates.length,
+    discoveryLevel: nationalDiscovery.discoveryLevel,
+    apiErrorCategory: nationalDiscovery.apiErrorCategory,
+    apiStatus: getAgmarknetApiStatus(),
     searchSummary: {
       originAddress: farmerLocation.formattedAddress,
       cropName: crop.name,
@@ -327,4 +504,3 @@ export async function discoverAndEvaluateMandis(
     },
   };
 }
-

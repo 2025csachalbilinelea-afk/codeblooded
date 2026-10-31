@@ -111,6 +111,12 @@ npm run dev
 pnpm run dev
 ```
 
+This starts both the Vite frontend and the Node API server used by `/api/search/prices`.
+The backend reads `TAVILY_API_KEY` and `SEARCH_PROVIDER` from the project-root `.env`
+file (`codeblooded/.env`); set `TAVILY_API_KEY` to your own key and
+`SEARCH_PROVIDER=tavily`. Do not put backend credentials in `VITE_` variables or
+commit `.env`. The `.env.example` file contains blank credential placeholders.
+
 ### 3. Build for Production
 ```bash
 npm run build
@@ -122,4 +128,3 @@ pnpm run build
 
 ## ⚖️ Simulation Disclaimer
 All market prices, distances, and capacities in this initial prototype are generated from realistic, configurable demonstration models and are clearly identified as simulated data. No fictional prices are represented as live government APMC quotations.
-

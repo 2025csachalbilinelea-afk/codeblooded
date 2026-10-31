@@ -1,0 +1,189 @@
+{
+  "version": "v1.0.0-xgb-production",
+  "algorithm": "XGBoostRegressor",
+  "training_timestamp": "2026-10-30T22:57:20.784049Z",
+  "feature_columns": [
+    "price_current",
+    "lag_1",
+    "lag_2",
+    "lag_3",
+    "lag_7",
+    "lag_14",
+    "mean_7d",
+    "mean_14d",
+    "mean_30d",
+    "vol_7d",
+    "vol_14d",
+    "delta_1d",
+    "delta_7d",
+    "pct_return_7d",
+    "price_to_mean_14d",
+    "arrival_qty",
+    "mean_arrival_7d",
+    "arrival_ratio",
+    "weather_rain_7d",
+    "weather_temp_7d",
+    "weather_humidity",
+    "month",
+    "day_of_week",
+    "season",
+    "month_sin",
+    "month_cos",
+    "doy_sin",
+    "doy_cos"
+  ],
+  "supported_crops": [
+    "Chilli Red",
+    "Cotton",
+    "Maize",
+    "Mustard",
+    "Onion",
+    "Paddy(Dhan)",
+    "Potato",
+    "Soyabean",
+    "Tomato",
+    "Wheat"
+  ],
+  "supported_markets": [
+    "ap-guntur-apmc",
+    "dl-azadpur-apmc",
+    "ka-hubballi-apmc",
+    "mh-lasalgaon-apmc",
+    "mh-vashi-apmc",
+    "mp-indore-apmc",
+    "pb-khanna-apmc",
+    "up-agra-apmc"
+  ],
+  "horizons": {
+    "3d": {
+      "horizon_days": 3,
+      "test_samples": 4521,
+      "xgboost": {
+        "mae": 44.25,
+        "rmse": 81.78,
+        "smape": 0.99
+      },
+      "baseline_naive": {
+        "mae": 45.71,
+        "rmse": 71.91,
+        "smape": 1.25
+      },
+      "baseline_ma7": {
+        "mae": 65.4,
+        "rmse": 102.25,
+        "smape": 1.77
+      },
+      "error_reduction_pct": 3.19,
+      "residual_intervals_80pct": {
+        "residual_mean": 15.291040228109445,
+        "residual_std": 69.88589691194463,
+        "q10_offset": -34.16,
+        "q90_offset": 60.71
+      }
+    },
+    "7d": {
+      "horizon_days": 7,
+      "test_samples": 4521,
+      "xgboost": {
+        "mae": 53.59,
+        "rmse": 109.38,
+        "smape": 1.12
+      },
+      "baseline_naive": {
+        "mae": 65.27,
+        "rmse": 101.82,
+        "smape": 1.76
+      },
+      "baseline_ma7": {
+        "mae": 96.14,
+        "rmse": 149.45,
+        "smape": 2.6
+      },
+      "error_reduction_pct": 17.89,
+      "residual_intervals_80pct": {
+        "residual_mean": 26.150881147806622,
+        "residual_std": 84.25887108635494,
+        "q10_offset": -29.41,
+        "q90_offset": 80.77
+      }
+    },
+    "14d": {
+      "horizon_days": 14,
+      "test_samples": 4521,
+      "xgboost": {
+        "mae": 97.16,
+        "rmse": 204.63,
+        "smape": 2.01
+      },
+      "baseline_naive": {
+        "mae": 128.31,
+        "rmse": 199.67,
+        "smape": 3.45
+      },
+      "baseline_ma7": {
+        "mae": 156.69,
+        "rmse": 242.34,
+        "smape": 4.21
+      },
+      "error_reduction_pct": 24.28,
+      "residual_intervals_80pct": {
+        "residual_mean": 57.97896674502213,
+        "residual_std": 145.7751770262021,
+        "q10_offset": -46.7,
+        "q90_offset": 162.95
+      }
+    }
+  },
+  "crop_performance_7d": {
+    "Chilli Red": {
+      "mae": 253.05,
+      "rmse": 307.22,
+      "smape": 1.22
+    },
+    "Wheat": {
+      "mae": 13.58,
+      "rmse": 16.62,
+      "smape": 0.53
+    },
+    "Cotton": {
+      "mae": 183.48,
+      "rmse": 273.39,
+      "smape": 2.21
+    },
+    "Maize": {
+      "mae": 14.39,
+      "rmse": 17.67,
+      "smape": 0.59
+    },
+    "Tomato": {
+      "mae": 43.02,
+      "rmse": 52.88,
+      "smape": 1.45
+    },
+    "Onion": {
+      "mae": 36.08,
+      "rmse": 43.96,
+      "smape": 1.19
+    },
+    "Mustard": {
+      "mae": 139.87,
+      "rmse": 187.22,
+      "smape": 2.27
+    },
+    "Paddy(Dhan)": {
+      "mae": 16.06,
+      "rmse": 19.99,
+      "smape": 0.57
+    },
+    "Potato": {
+      "mae": 22.55,
+      "rmse": 27.83,
+      "smape": 1.29
+    },
+    "Soyabean": {
+      "mae": 52.57,
+      "rmse": 62.47,
+      "smape": 0.98
+    }
+  }
+}
