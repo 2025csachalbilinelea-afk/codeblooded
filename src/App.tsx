@@ -57,7 +57,8 @@ const INITIAL_INPUTS: FarmerInputs = {
   harvestDate: new Date().toISOString().split('T')[0],
   maturity: 'optimal',
   originLocation: INITIAL_LOCATION.formattedAddress,
-  gradeDistribution: { A: 50, B: 35, C: 15 },
+  gradePricingMode: 'grades',
+  gradeDistribution: { A: 40, B: 40, C: 20 },
   spoilage: {
     mode: 'automatic',
     manualPercentage: 4,
@@ -175,6 +176,8 @@ export const App: React.FC = () => {
       {
         sortOption,
         filters,
+        gradePricingMode: inputs.gradePricingMode,
+        gradeDistribution: inputs.gradeDistribution,
       }
     )
       .then((res) => {
@@ -198,6 +201,8 @@ export const App: React.FC = () => {
     inputs.transport,
     inputs.spoilage,
     inputs.maturity,
+    inputs.gradePricingMode,
+    inputs.gradeDistribution,
     sortOption,
     filters,
   ]);

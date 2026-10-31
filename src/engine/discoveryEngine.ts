@@ -4,7 +4,14 @@
  * and physical spoilage to rank agricultural mandis across India by estimated net selling revenue.
  */
 
-import { CropProfile, MaturityFreshness, SpoilageInputs, TransportConfig } from '../types/agriculture';
+import {
+  CropProfile,
+  MaturityFreshness,
+  SpoilageInputs,
+  TransportConfig,
+  GradeDistribution,
+  GradePricingMode,
+} from '../types/agriculture';
 import {
   DynamicMandiEvaluation,
   FarmerLocation,
@@ -68,7 +75,9 @@ export function evaluateMarketCandidate(
   quantityQuintals: number,
   spoilage: SpoilageInputs,
   maturity: MaturityFreshness,
-  transport: TransportConfig
+  transport: TransportConfig,
+  gradePricingMode?: GradePricingMode,
+  gradeDistribution?: GradeDistribution
 ): DynamicMandiEvaluation {
   const infeasibilityReasons: string[] = [];
 
@@ -126,7 +135,34 @@ export function evaluateMarketCandidate(
   const saleableQuintals = Math.max(0, Math.round((quantityQuintals - spoilageLossQuintals) * 100) / 100);
 
   // Calculate Gross Revenue - ONLY when verified price is available!
-  const grossRevenue = hasVerifiedPrice ? Math.round(saleableQuintals * modalPrice) : 0;
+  const gradeAPrice = modalPrice;
+  const gradeBPrice = Math.round(modalPrice * 0.90);
+  const gradeCPrice = Math.round(modalPrice * 0.75);
+
+  let effectivePrice = modalPrice;
+  if (hasVerifiedPrice) {
+    if (gradePricingMode === 'bulk') {
+      effectivePrice = gradeBPrice;
+    } else if (gradeDistribution) {
+      const rawA = gradeDistribution.A ?? 0;
+      const rawB = gradeDistribution.B ?? 0;
+      const rawC = gradeDistribution.C ?? 0;
+      const sum = rawA + rawB + rawC;
+      if (Math.abs(sum - 100) <= 0.5) {
+        effectivePrice = Math.round(
+          (gradeAPrice * (rawA / 100)) +
+          (gradeBPrice * (rawB / 100)) +
+          (gradeCPrice * (rawC / 100))
+        );
+      } else {
+        effectivePrice = gradeBPrice;
+      }
+    } else {
+      effectivePrice = gradeBPrice;
+    }
+  }
+
+  const grossRevenue = hasVerifiedPrice ? Math.round(saleableQuintals * effectivePrice) : 0;
 
   // Calculate Transport Costs using authentic road distance
   const transportCalc = calculateTransportationCost(transport, route.roadDistanceKm, quantityQuintals);
@@ -213,6 +249,8 @@ export async function discoverAndEvaluateMandis(
     sortOption?: MandiSortOption;
     filters?: MandiFilterOptions;
     apiKey?: string;
+    gradePricingMode?: GradePricingMode;
+    gradeDistribution?: GradeDistribution;
   }
 ): Promise<DiscoveryEngineResult> {
   const sortOption = options?.sortOption || 'netRevenue';
@@ -322,7 +360,9 @@ export async function discoverAndEvaluateMandis(
       quantityQuintals,
       spoilage,
       maturity,
-      transport
+      transport,
+      options?.gradePricingMode,
+      options?.gradeDistribution
     );
   });
 

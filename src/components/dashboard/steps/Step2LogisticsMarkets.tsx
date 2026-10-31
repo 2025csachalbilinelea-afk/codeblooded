@@ -129,9 +129,9 @@ export const Step2LogisticsMarkets: React.FC<Step2LogisticsMarketsProps> = ({
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           {/* Section 1: Produce Loss Estimation Form */}
-          <div className="lg:col-span-6 space-y-6">
+          <div className="h-full">
             <SpoilageConfigForm
               spoilage={inputs.spoilage}
               crop={currentCrop}
@@ -141,7 +141,7 @@ export const Step2LogisticsMarkets: React.FC<Step2LogisticsMarketsProps> = ({
           </div>
 
           {/* Section 2: Transportation & Vehicle Details Form */}
-          <div className="lg:col-span-6 space-y-6">
+          <div className="h-full">
             <TransportConfigForm
               transport={inputs.transport}
               totalQuintals={totalQuintals}
@@ -152,13 +152,18 @@ export const Step2LogisticsMarkets: React.FC<Step2LogisticsMarketsProps> = ({
         </div>
 
         {/* Consignment Logistics Summary Strip */}
-        <div className="bg-white rounded-3xl border border-rural-border p-5 sm:p-6 shadow-rural-soft space-y-3.5">
-          <h4 className="font-serif font-bold text-base text-rural-forest flex items-center space-x-2">
-            <ShieldCheck className="w-4 h-4 text-rural-primary" />
-            <span>Consignment Logistics & Sufficiency Summary</span>
-          </h4>
+        <div className="bg-white rounded-3xl border border-rural-border p-5 sm:p-6 shadow-rural-soft space-y-3 mt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-rural-border/70 gap-2">
+            <h4 className="font-serif font-bold text-base text-rural-forest flex items-center space-x-2">
+              <ShieldCheck className="w-4 h-4 text-rural-primary" />
+              <span>Consignment Logistics & Sufficiency Summary</span>
+            </h4>
+            <span className="text-xs text-rural-muted">
+              Turn-by-turn road logistics applied across all candidate APMC mandis
+            </span>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
             <div className="p-3.5 rounded-2xl bg-rural-cream border border-rural-border">
               <span className="text-[10px] uppercase font-bold text-rural-muted block">Harvest Weight</span>
               <span className="font-serif font-bold text-base text-rural-forest block mt-0.5">
@@ -170,7 +175,7 @@ export const Step2LogisticsMarkets: React.FC<Step2LogisticsMarketsProps> = ({
             </div>
 
             <div className="p-3.5 rounded-2xl bg-rural-cream border border-rural-border">
-              <span className="text-[10px] uppercase font-bold text-rural-muted block">Vehicle Mode</span>
+              <span className="text-[10px] uppercase font-bold text-rural-muted block">Vehicle Mode & Space</span>
               <span className="font-serif font-bold text-base text-rural-forest block mt-0.5">
                 {isOwn ? 'My Own Vehicle' : 'Rented Commercial Vehicle'}
               </span>
@@ -180,12 +185,12 @@ export const Step2LogisticsMarkets: React.FC<Step2LogisticsMarketsProps> = ({
             </div>
 
             <div className="p-3.5 rounded-2xl bg-rural-sage/60 border border-rural-border">
-              <span className="text-[10px] uppercase font-bold text-rural-muted block">Journey Scale</span>
+              <span className="text-[10px] uppercase font-bold text-rural-muted block">Logistics Sufficiency</span>
               <span className="font-serif font-bold text-base text-rural-forest block mt-0.5">
-                {tripsNeeded} {tripsNeeded === 1 ? 'Trip Required' : 'Separate Trips Required'}
+                {tripsNeeded} {tripsNeeded === 1 ? 'Trip (100% Sufficient)' : 'Separate Trips Required'}
               </span>
               <span className="text-[10px] text-rural-muted block mt-0.5">
-                {tripsNeeded === 1 ? 'Entire harvest fits in 1 trip' : 'Consignment scales multi-trip costs'}
+                {tripsNeeded === 1 ? 'Entire harvest fits in single journey' : 'Consignment requires multi-trip shuttle'}
               </span>
             </div>
           </div>

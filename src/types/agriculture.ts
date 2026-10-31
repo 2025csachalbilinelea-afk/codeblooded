@@ -12,6 +12,8 @@ export type QuantityUnit = 'kg' | 'quintal' | 'tonne';
 
 export type Grade = 'A' | 'B' | 'C';
 
+export type GradePricingMode = 'grades' | 'bulk';
+
 export interface GradeDistribution {
   A: number; // percentage 0-100
   B: number;
@@ -119,6 +121,7 @@ export interface FarmerInputs {
   maturity: MaturityFreshness;
   originLocation: string;
   expectedPricePerQuintal?: number; // Simplified buyer offer price entered by farmer
+  gradePricingMode?: GradePricingMode; // 'grades' | 'bulk'
   gradeDistribution?: GradeDistribution; // Optional for backward compatibility
   spoilage: SpoilageInputs;
   transport: TransportConfig;

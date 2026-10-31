@@ -81,22 +81,23 @@ export const TransportConfigForm: React.FC<TransportConfigProps> = ({
   const fuelRatePerKm = ownMileage > 0 && ownFuelPrice > 0 ? ownFuelPrice / ownMileage : 0;
 
   return (
-    <div className="bg-white rounded-3xl border border-rural-border shadow-rural-soft p-5 sm:p-6">
-      <div className="flex items-center justify-between mb-4 border-b border-rural-border/70 pb-3">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-xl bg-rural-mint text-rural-primary flex items-center justify-center shadow-sm">
-            <Truck className="w-4 h-4 stroke-[2.2]" />
-          </div>
-          <div>
-            <h2 className="text-base font-serif font-bold text-rural-forest">
-              4. Transport Details
-            </h2>
-            <p className="text-xs text-rural-muted">
-              Choose how your harvest will travel to market
-            </p>
+    <div className="bg-white rounded-3xl border border-rural-border shadow-rural-soft p-5 sm:p-6 h-full flex flex-col justify-between space-y-4">
+      <div>
+        <div className="flex items-center justify-between mb-4 border-b border-rural-border/70 pb-3">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-rural-mint text-rural-primary flex items-center justify-center shadow-sm">
+              <Truck className="w-4 h-4 stroke-[2.2]" />
+            </div>
+            <div>
+              <h2 className="text-base font-serif font-bold text-rural-forest">
+                2. Transport Details
+              </h2>
+              <p className="text-xs text-rural-muted">
+                Choose how your harvest will travel to market
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Two Transport Options: Option A vs Option B */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
@@ -366,38 +367,6 @@ export const TransportConfigForm: React.FC<TransportConfigProps> = ({
           </div>
         </div>
       )}
-
-      {/* "YOUR TRANSPORT ESTIMATE" SUMMARY CARD */}
-      <div className="bg-rural-sage/60 rounded-2xl p-4 border border-rural-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-rural-mint text-rural-primary flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold text-rural-forest">
-              Your Transport Estimate
-            </h4>
-            <p className="text-xs text-rural-muted">
-              Vehicle Capacity: <strong>{capacity} Quintals</strong> • Harvest to deliver: <strong>{totalQuintals.toFixed(1)} Quintals</strong>
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <span
-            className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
-              isSingleTrip
-                ? 'bg-rural-mint text-rural-forest border border-rural-fresh/40'
-                : 'bg-amber-100 text-amber-900 border border-amber-300'
-            }`}
-          >
-            <span>
-              {isSingleTrip
-                ? '1 Trip Sufficient'
-                : `Requires ${trips} Trips (Consignment exceeds vehicle space)`}
-            </span>
-          </span>
-        </div>
       </div>
     </div>
   );

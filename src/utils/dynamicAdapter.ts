@@ -10,8 +10,8 @@ export function convertDynamicToMarketCalculationResult(
 ): MarketCalculationResult {
   const price = evalItem.priceRecord?.modalPrice || 0;
   const gradeAPrice = price;
-  const gradeBPrice = Math.round(price * 0.88);
-  const gradeCPrice = Math.round(price * 0.72);
+  const gradeBPrice = Math.round(price * 0.90);
+  const gradeCPrice = Math.round(price * 0.75);
 
   return {
     market: {

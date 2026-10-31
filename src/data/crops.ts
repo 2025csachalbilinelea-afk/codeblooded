@@ -471,6 +471,32 @@ export const CROP_CATEGORIES: { id: CropCategory; label: string; icon: string }[
   { id: 'other', label: 'Other Agricultural Produce', icon: 'Boxes' },
 ];
 
+export const CORE_CROP_IDS = [
+  'tomato',
+  'potato',
+  'brinjal',
+  'onion',
+  'carrot',
+  'rice',
+  'wheat',
+  'maize',
+  'chilli',
+  'green_gram',
+] as const;
+
+export const CORE_CROPS: CropProfile[] = [
+  getCropById('tomato'),
+  getCropById('potato'),
+  getCropById('brinjal'),
+  getCropById('onion'),
+  getCropById('carrot'),
+  getCropById('rice'),
+  getCropById('wheat'),
+  getCropById('maize'),
+  getCropById('chilli'),
+  getCropById('green_gram'),
+];
+
 export function getCropById(id: string): CropProfile {
   const found = CROP_PROFILES.find((c) => c.id === id);
   return found || CROP_PROFILES[0];
