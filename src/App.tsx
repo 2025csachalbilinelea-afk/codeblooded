@@ -26,14 +26,11 @@ import { LandingPage } from './components/landing/LandingPage';
 import { Navbar, AppView } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 
-// Guided Workflow Dashboard Steps
+// Restructured 3-Step Farmer Workflow Components
 import { StepNavigation, DashboardStep } from './components/dashboard/StepNavigation';
-import { Step1Overview } from './components/dashboard/steps/Step1Overview';
-import { Step2CropHarvest } from './components/dashboard/steps/Step2CropHarvest';
-import { Step3Location } from './components/dashboard/steps/Step3Location';
-import { Step4Logistics } from './components/dashboard/steps/Step4Logistics';
-import { Step5MandiDiscovery } from './components/dashboard/steps/Step5MandiDiscovery';
-import { Step6ProfitDecision } from './components/dashboard/steps/Step6ProfitDecision';
+import { Step1HarvestFarm } from './components/dashboard/steps/Step1HarvestFarm';
+import { Step2LogisticsMarkets } from './components/dashboard/steps/Step2LogisticsMarkets';
+import { Step3ProfitDecision } from './components/dashboard/steps/Step3ProfitDecision';
 
 // B2B Institutional Marketplace
 import { BulkBuyerMarketplace } from './components/marketplace/BulkBuyerMarketplace';
@@ -73,8 +70,8 @@ const INITIAL_INPUTS: FarmerInputs = {
     type: 'own',
     ownVehicle: {
       capacityQuintals: 25,
-      mileageKmPerLitre: 8,
-      fuelPricePerLitre: 96,
+      mileageKmPerLitre: 10,
+      fuelPricePerLitre: 95,
       maintenancePerKm: 2,
       driverCostPerTrip: 500,
       tollAndOtherExpenses: 200,
@@ -102,7 +99,7 @@ export const App: React.FC = () => {
     return 'landing';
   });
 
-  // Guided Multi-Step Workflow Step (1..6)
+  // Simplified 3-Step Guided Workflow Step (1..3)
   const [currentStep, setCurrentStep] = useState<DashboardStep>(1);
 
   // Synchronize browser history and URL paths
@@ -389,14 +386,11 @@ export const App: React.FC = () => {
     setSelectedBreakdownMarket(converted);
   };
 
-  // Completed steps calculation for progress indicators
+  // Completed steps calculation for 3-step progress indicators
   const completedSteps = useMemo<DashboardStep[]>(() => {
     const list: DashboardStep[] = [];
-    if (currentStep > 1) list.push(1);
-    if (currentStep > 2 && validation.isValid) list.push(2);
-    if (currentStep > 3) list.push(3);
-    if (currentStep > 4) list.push(4);
-    if (currentStep > 5 && verifiedMarketCalculations.length > 0) list.push(5);
+    if (currentStep > 1 && validation.isValid) list.push(1);
+    if (currentStep > 2 && verifiedMarketCalculations.length > 0) list.push(2);
     return list;
   }, [currentStep, validation.isValid, verifiedMarketCalculations.length]);
 
@@ -405,7 +399,7 @@ export const App: React.FC = () => {
     return (
       <LandingPage
         onOpenDashboard={() => handleNavigateView('dashboard', 1)}
-        onOpenMandiPrices={() => handleNavigateView('dashboard', 5)}
+        onOpenMandiPrices={() => handleNavigateView('dashboard', 2)}
         onOpenMarketplace={() => handleNavigateView('marketplace')}
         onOpenReports={handlePrint}
       />
@@ -441,7 +435,7 @@ export const App: React.FC = () => {
     );
   }
 
-  // VIEW 3: GUIDED 6-STEP FARMER DASHBOARD
+  // VIEW 3: RESTRUCTURED 3-STEP FARMER WORKFLOW DASHBOARD
   return (
     <div className="min-h-screen flex flex-col bg-rural-cream text-rural-charcoal font-sans selection:bg-rural-mint selection:text-rural-deep">
       {/* Top Application Navigation */}
@@ -528,7 +522,7 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* Sticky Guided 6-Step Workflow Stepper */}
+        {/* Beautiful 3-Step Guided Workflow Progress Navigation */}
         <StepNavigation
           currentStep={currentStep}
           onStepChange={(s) => {
@@ -540,49 +534,46 @@ export const App: React.FC = () => {
 
         {/* Active Step Content */}
         <div className="transition-all duration-200">
+          {/* STEP 1: HARVEST & FARM DETAILS (Merged Crop + Harvest + Location + Map) */}
           {currentStep === 1 && (
-            <Step1Overview
-              currentCrop={currentCrop}
-              farmerLocation={farmerLocation}
-              totalQuintals={totalQuintals}
-              recommendedMarket={dynamicResult?.recommendedMarket || null}
-              onStartHarvest={() => setCurrentStep(2)}
-              onGoToMandiDiscovery={() => setCurrentStep(5)}
-              onGoToMarketplace={() => handleNavigateView('marketplace')}
-              onGoToReports={handlePrint}
-              onGoToStep={(s) => setCurrentStep(s)}
-            />
-          )}
-
-          {currentStep === 2 && (
-            <Step2CropHarvest
+            <Step1HarvestFarm
               currentCrop={currentCrop}
               inputs={inputs}
-              onCropChange={handleCropChange}
-              onInputsChange={(updates) => updateInputs((prev) => ({ ...prev, ...updates }))}
-              quantityError={validation.errors.quantity}
-              onNext={() => setCurrentStep(3)}
-              onBack={() => setCurrentStep(1)}
-            />
-          )}
-
-          {currentStep === 3 && (
-            <Step3Location
               farmerLocation={farmerLocation}
               evaluations={dynamicResult?.evaluatedMarkets || []}
               recommendedMarket={dynamicResult?.recommendedMarket || null}
+              onCropChange={handleCropChange}
+              onInputsChange={(updates) => updateInputs((prev) => ({ ...prev, ...updates }))}
               onLocationChange={handleLocationChange}
               onSelectBreakdown={handleSelectDynamicBreakdown}
-              onNext={() => setCurrentStep(4)}
-              onBack={() => setCurrentStep(2)}
+              quantityError={validation.errors.quantity}
+              onNext={() => {
+                if (totalQuintals <= 0) {
+                  alert('Please specify a valid harvest quantity greater than zero.');
+                  return;
+                }
+                setCurrentStep(2);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
           )}
 
-          {currentStep === 4 && (
-            <Step4Logistics
+          {/* STEP 2: LOSS, LOGISTICS & MARKET DISCOVERY (Merged Spoilage + Transport + Mandi Discovery) */}
+          {currentStep === 2 && (
+            <Step2LogisticsMarkets
               currentCrop={currentCrop}
               totalQuintals={totalQuintals}
               inputs={inputs}
+              farmerLocation={farmerLocation}
+              evaluations={dynamicResult?.evaluatedMarkets || []}
+              recommendedMarket={dynamicResult?.recommendedMarket || null}
+              closestFeasibleMarket={dynamicResult?.closestFeasibleMarket || null}
+              totalCandidatesFound={dynamicResult?.totalCandidatesFound || 0}
+              sortOption={sortOption}
+              filters={filters}
+              onSortChange={setSortOption}
+              onFilterChange={(newF) => setFilters((prev) => ({ ...prev, ...newF }))}
+              onSelectBreakdown={handleSelectDynamicBreakdown}
               onUpdateSpoilage={(updates) =>
                 updateInputs((prev) => ({
                   ...prev,
@@ -595,36 +586,26 @@ export const App: React.FC = () => {
                   transport: { ...prev.transport, ...updates },
                 }))
               }
-              validationErrors={validation.errors}
-              onNext={() => setCurrentStep(5)}
-              onBack={() => setCurrentStep(3)}
-            />
-          )}
-
-          {currentStep === 5 && (
-            <Step5MandiDiscovery
-              farmerLocation={farmerLocation}
-              evaluations={dynamicResult?.evaluatedMarkets || []}
-              recommendedMarket={dynamicResult?.recommendedMarket || null}
-              closestFeasibleMarket={dynamicResult?.closestFeasibleMarket || null}
-              totalCandidatesFound={dynamicResult?.totalCandidatesFound || 0}
-              sortOption={sortOption}
-              filters={filters}
-              onSortChange={setSortOption}
-              onFilterChange={(newF) => setFilters((prev) => ({ ...prev, ...newF }))}
-              onSelectBreakdown={handleSelectDynamicBreakdown}
               apiStatus={dynamicResult?.apiStatus}
               cropName={currentCrop.name}
               discoveryLevel={dynamicResult?.discoveryLevel}
               apiErrorCategory={dynamicResult?.apiErrorCategory}
               isDiscovering={isDiscovering}
-              onNext={() => setCurrentStep(6)}
-              onBack={() => setCurrentStep(4)}
+              validationErrors={validation.errors}
+              onNext={() => {
+                setCurrentStep(3);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onBack={() => {
+                setCurrentStep(1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
           )}
 
-          {currentStep === 6 && (
-            <Step6ProfitDecision
+          {/* STEP 3: PROFIT DECISION (Comprehensive Take-Home Profit & Recommendation Hub) */}
+          {currentStep === 3 && (
+            <Step3ProfitDecision
               bestMarket={bestSingleMarket}
               totalQuintals={totalQuintals}
               comparison={comparison}
@@ -632,8 +613,14 @@ export const App: React.FC = () => {
               feasibleMarkets={verifiedFeasibleMarkets}
               onSelectBreakdown={(m) => setSelectedBreakdownMarket(m)}
               onPrintReport={handlePrint}
-              onStartNewHarvest={() => setCurrentStep(1)}
-              onBack={() => setCurrentStep(5)}
+              onStartNewHarvest={() => {
+                setCurrentStep(1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onBack={() => {
+                setCurrentStep(2);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
           )}
         </div>

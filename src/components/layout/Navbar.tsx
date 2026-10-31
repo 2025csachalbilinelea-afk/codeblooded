@@ -18,8 +18,8 @@ export type AppView = 'landing' | 'dashboard' | 'marketplace' | 'reports';
 
 interface NavbarProps {
   currentView: AppView;
-  currentStep?: 1 | 2 | 3 | 4 | 5 | 6;
-  onNavigateView: (view: AppView, step?: 1 | 2 | 3 | 4 | 5 | 6) => void;
+  currentStep?: 1 | 2 | 3;
+  onNavigateView: (view: AppView, step?: 1 | 2 | 3) => void;
   onResetDefaults?: () => void;
   onPrint?: () => void;
   onToggleVerification?: () => void;
@@ -37,7 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleNavClick = (view: AppView, step?: 1 | 2 | 3 | 4 | 5 | 6) => {
+  const handleNavClick = (view: AppView, step?: 1 | 2 | 3) => {
     setIsMobileMenuOpen(false);
     onNavigateView(view, step);
   };
@@ -76,7 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={() => handleNavClick('dashboard', 1)}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                  currentView === 'dashboard' && currentStep !== 5
+                  currentView === 'dashboard' && currentStep !== 2
                     ? 'bg-white/15 text-white font-semibold'
                     : 'text-white/80 hover:text-white hover:bg-white/10'
                 }`}
@@ -87,9 +87,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 type="button"
-                onClick={() => handleNavClick('dashboard', 5)}
+                onClick={() => handleNavClick('dashboard', 2)}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                  currentView === 'dashboard' && currentStep === 5
+                  currentView === 'dashboard' && currentStep === 2
                     ? 'bg-white/15 text-white font-semibold'
                     : 'text-white/80 hover:text-white hover:bg-white/10'
                 }`}
@@ -228,20 +228,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={() => handleNavClick('dashboard', 1)}
               className={`flex items-center space-x-2 px-3 py-2.5 rounded-xl text-left transition-colors ${
-                currentView === 'dashboard' && currentStep !== 5
+                currentView === 'dashboard' && currentStep !== 2
                   ? 'bg-white/15 font-semibold text-white'
                   : 'hover:bg-white/10 text-white/80'
               }`}
             >
               <LayoutDashboard className="w-4 h-4 text-rural-mint" />
-              <span>Farmer Dashboard (6-Step Workflow)</span>
+              <span>Farmer Dashboard (3-Step Workflow)</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleNavClick('dashboard', 5)}
+              onClick={() => handleNavClick('dashboard', 2)}
               className={`flex items-center space-x-2 px-3 py-2.5 rounded-xl text-left transition-colors ${
-                currentView === 'dashboard' && currentStep === 5
+                currentView === 'dashboard' && currentStep === 2
                   ? 'bg-white/15 font-semibold text-white'
                   : 'hover:bg-white/10 text-white/80'
               }`}
